@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShimmerBadge } from '@/components/ui/shimmer-badge';
+import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Highlighter } from "@/components/magicui/highlighter";
 import {
@@ -141,10 +141,10 @@ export function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
             >
-              <ShimmerBadge variant="shimmer" className="mb-4">
+              <Badge variant="outline" className="mb-4">
                 <Zap className="mr-1 h-3 w-3" />
                 Advanced Hostel Security System
-              </ShimmerBadge>
+              </Badge>
               <h1 className="text-4xl lg:text-6xl font-bold tracking-tight text-foreground">
                 Secure Your Hostel with
                 <br />

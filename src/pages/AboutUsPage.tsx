@@ -19,23 +19,23 @@ export function AboutUsPage() {
   const teamMembers = [
     {
       name: 'Team Member 1',
-      role: 'Full Stack Developer',
-      description: 'Specializing in React and Node.js development'
+      role: '992200',
+      description: 'CSE/KARE'
     },
     {
       name: 'Team Member 2',
-      role: 'UI/UX Designer',
-      description: 'Creating intuitive and beautiful user experiences'
+      role: '992200',
+      description: 'CSE/KARE'
     },
     {
       name: 'Team Member 3',
-      role: 'Security Specialist',
-      description: 'Ensuring robust security implementations'
+      role: '992200',
+      description: 'CSE/KARE'
     },
     {
       name: 'Team Member 4',
-      role: 'Backend Developer',
-      description: 'Building scalable server-side solutions'
+      role: '992200',
+      description: 'CSE/KARE'
     }
   ];
 
