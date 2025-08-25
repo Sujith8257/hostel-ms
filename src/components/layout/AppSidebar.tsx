@@ -18,17 +18,16 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Home,
-  FolderOpen,
   AlertTriangle,
   Users,
   Settings,
   HelpCircle,
   Shield,
   Search,
-  MapPin,
   Activity,
   Database,
   BarChart3,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -47,59 +46,73 @@ const navigation: NavItem[] = [
     href: '/dashboard',
   },
   {
-    title: 'Case Management',
-    icon: FolderOpen,
-    href: '/cases',
-    roles: ['admin', 'case_manager'],
+    title: 'Students',
+    icon: Users,
+    href: '/students',
+    roles: ['admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden', 'floor_incharge'],
   },
   {
-    title: 'Alert Dashboard',
+    title: 'Entry/Exit Logs',
+    icon: Activity,
+    href: '/entries',
+    roles: ['admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden'],
+  },
+  {
+    title: 'Security Alerts',
     icon: AlertTriangle,
     href: '/alerts',
-    badge: '3',
+    badge: '2',
   },
   {
-    title: 'Missing Persons',
+    title: 'Room Management',
+    icon: Building2,
+    href: '/rooms',
+    roles: ['admin', 'hostel_director', 'warden', 'deputy_warden'],
+  },
+  {
+    title: 'Security Monitor',
+    icon: Shield,
+    href: '/security',
+    roles: ['admin', 'hostel_director', 'warden', 'deputy_warden'],
+  },
+  {
+    title: 'Visitor Management',
     icon: Search,
-    href: '/missing-persons',
+    href: '/visitors',
+    roles: ['admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden'],
   },
   {
-    title: 'Map View',
-    icon: MapPin,
-    href: '/map',
-  },
-  {
-    title: 'Analytics',
+    title: 'Reports',
     icon: BarChart3,
-    href: '/analytics',
-    roles: ['admin', 'case_manager'],
+    href: '/reports',
+    roles: ['admin', 'hostel_director', 'warden'],
   },
 ];
 
 const adminNavigation: NavItem[] = [
   {
-    title: 'User Management',
+    title: 'Staff Management',
     icon: Users,
-    href: '/admin/users',
-    roles: ['admin'],
+    href: '/admin/staff',
+    roles: ['admin', 'hostel_director'],
   },
   {
     title: 'System Settings',
     icon: Settings,
     href: '/admin/settings',
-    roles: ['admin'],
+    roles: ['admin', 'hostel_director'],
   },
   {
-    title: 'Camera Sources',
+    title: 'Access Control',
     icon: Activity,
-    href: '/admin/cameras',
-    roles: ['admin'],
+    href: '/admin/access-control',
+    roles: ['admin', 'hostel_director'],
   },
   {
-    title: 'AI Model Config',
+    title: 'Notifications',
     icon: Database,
-    href: '/admin/ai-config',
-    roles: ['admin'],
+    href: '/admin/notifications',
+    roles: ['admin', 'hostel_director'],
   },
 ];
 
@@ -116,6 +129,18 @@ function SidebarNav() {
     !item.roles || item.roles.includes(user?.role || '')
   );
 
+  const getRoleDisplayName = (role: string) => {
+    const roleMap = {
+      admin: 'Administrator',
+      hostel_director: 'Hostel Director',
+      warden: 'Warden',
+      deputy_warden: 'Deputy Warden',
+      assistant_warden: 'Assistant Warden',
+      floor_incharge: 'Floor Incharge'
+    };
+    return roleMap[role as keyof typeof roleMap] || role;
+  };
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -124,7 +149,7 @@ function SidebarNav() {
             <SidebarMenuButton size="lg" asChild>
               <div className="flex items-center gap-2">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <Shield className="size-4" />
+                  <Building2 className="size-4" />
                 </div>
                 {state === "expanded" && (
                   <motion.div
@@ -133,8 +158,8 @@ function SidebarNav() {
                     exit={{ opacity: 0, x: -20 }}
                     className="flex flex-col gap-0.5 leading-none"
                   >
-                    <span className="font-semibold">TraceVision</span>
-                    <span className="text-xs text-muted-foreground">Missing Persons Detection</span>
+                    <span className="font-semibold">HostelMS</span>
+                    <span className="text-xs text-muted-foreground">Hostel Management System</span>
                   </motion.div>
                 )}
               </div>
@@ -221,7 +246,7 @@ function SidebarNav() {
             className="p-2 text-xs text-muted-foreground"
           >
             <div className="font-medium">{user.name}</div>
-            <div>{user.organization}</div>
+            <div>{getRoleDisplayName(user.role)}</div>
           </motion.div>
         )}
       </SidebarFooter>

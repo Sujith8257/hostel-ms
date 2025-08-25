@@ -1,208 +1,439 @@
-import { Layout } from '@/components/layout/Layout';
+import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { MapPin, Clock, Eye, CheckCircle, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+import { Layout } from '@/components/layout/Layout';
+import {
+  AlertTriangle,
+  Shield,
+  Users,
+  Clock,
+  Camera,
+  MapPin,
+  Search,
+  Filter,
+  Bell,
+  Eye,
+  CheckCircle,
+  XCircle,
+  AlertCircle
+} from 'lucide-react';
+
+interface Alert {
+  id: string;
+  type: 'unauthorized_entry' | 'rfid_failure' | 'suspicious_activity' | 'emergency' | 'system_error';
+  title: string;
+  description: string;
+  location: string;
+  timestamp: Date;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'active' | 'investigating' | 'resolved' | 'dismissed';
+  studentId?: string;
+  studentName?: string;
+  cameraId?: string;
+  actionTaken?: string;
+}
+
+const mockAlerts: Alert[] = [
+  {
+    id: 'ALT001',
+    type: 'unauthorized_entry',
+    title: 'Unauthorized Entry Attempt',
+    description: 'Unknown individual attempted to enter Block A using invalid RFID card',
+    location: 'Block A - Main Entrance',
+    timestamp: new Date('2024-01-15T14:30:00'),
+    severity: 'high',
+    status: 'active',
+    cameraId: 'CAM_A_001'
+  },
+  {
+    id: 'ALT002',
+    type: 'rfid_failure',
+    title: 'RFID System Malfunction',
+    description: 'Multiple RFID card reading failures detected at Block B entrance',
+    location: 'Block B - Main Entrance',
+    timestamp: new Date('2024-01-15T13:45:00'),
+    severity: 'medium',
+    status: 'investigating',
+    cameraId: 'CAM_B_001'
+  },
+  {
+    id: 'ALT003',
+    type: 'suspicious_activity',
+    title: 'Loitering Detected',
+    description: 'Individual has been present in parking area for over 2 hours without authorization',
+    location: 'Parking Area - Zone C',
+    timestamp: new Date('2024-01-15T12:15:00'),
+    severity: 'medium',
+    status: 'investigating',
+    cameraId: 'CAM_P_003'
+  },
+  {
+    id: 'ALT004',
+    type: 'emergency',
+    title: 'Emergency Button Activated',
+    description: 'Emergency alert triggered from Floor 3 common area',
+    location: 'Block A - Floor 3 Common Area',
+    timestamp: new Date('2024-01-15T11:20:00'),
+    severity: 'critical',
+    status: 'resolved',
+    actionTaken: 'Security responded in 2 minutes. False alarm - accidental activation.'
+  },
+  {
+    id: 'ALT005',
+    type: 'unauthorized_entry',
+    title: 'Tailgating Incident',
+    description: 'Student Raj Kumar (ID: ST2023001) allowed unauthorized person to follow through entrance',
+    location: 'Block C - Side Entrance',
+    timestamp: new Date('2024-01-15T10:30:00'),
+    severity: 'high',
+    status: 'resolved',
+    studentId: 'ST2023001',
+    studentName: 'Raj Kumar',
+    cameraId: 'CAM_C_002',
+    actionTaken: 'Student counseled. Visitor registered retroactively.'
+  },
+  {
+    id: 'ALT006',
+    type: 'system_error',
+    title: 'Camera Offline',
+    description: 'Security camera CAM_D_001 has been offline for 15 minutes',
+    location: 'Block D - Rear Entrance',
+    timestamp: new Date('2024-01-15T09:45:00'),
+    severity: 'medium',
+    status: 'investigating'
+  }
+];
 
 export function AlertsPage() {
-  const alerts = [
-    {
-      id: '1',
-      personName: 'Sarah Thompson',
-      caseId: 'CASE-2024-001',
-      detectionTime: '2024-08-25 14:30:15',
-      location: 'Downtown Station - Camera 12',
-      confidence: 94,
-      status: 'new',
-      imageUrl: '/api/placeholder/200/200'
-    },
-    {
-      id: '2',
-      personName: 'Michael Johnson',
-      caseId: 'CASE-2024-002',
-      detectionTime: '2024-08-25 13:45:22',
-      location: 'Shopping Mall - Camera 8',
-      confidence: 87,
-      status: 'verified',
-      imageUrl: '/api/placeholder/200/200'
-    },
-    {
-      id: '3',
-      personName: 'Emily Davis',
-      caseId: 'CASE-2024-003',
-      detectionTime: '2024-08-25 12:15:33',
-      location: 'Bus Terminal - Camera 3',
-      confidence: 91,
-      status: 'new',
-      imageUrl: '/api/placeholder/200/200'
-    },
-  ];
+  const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'new':
-        return <Badge variant="destructive">New</Badge>;
-      case 'verified':
-        return <Badge className="bg-green-100 text-green-800">Verified</Badge>;
-      case 'false_positive':
-        return <Badge variant="outline">False Positive</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+  const filteredAlerts = alerts.filter(alert => {
+    const matchesSearch = alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         alert.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         alert.location.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesSeverity = filterSeverity === 'all' || alert.severity === filterSeverity;
+    const matchesStatus = filterStatus === 'all' || alert.status === filterStatus;
+    const matchesType = filterType === 'all' || alert.type === filterType;
+    
+    return matchesSearch && matchesSeverity && matchesStatus && matchesType;
+  });
+
+  const getSeverityColor = (severity: Alert['severity']) => {
+    switch (severity) {
+      case 'critical': return 'bg-red-100 text-red-800 border-red-200';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-blue-100 text-blue-800 border-blue-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  return (
-    <Layout 
-      title="Alert Dashboard" 
-      breadcrumbs={[
-        { title: 'Dashboard', href: '/dashboard' },
-        { title: 'Alert Dashboard' }
-      ]}
-    >
-      <div className="space-y-6">
-        {/* Alert Summary */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="grid gap-4 md:grid-cols-3"
-        >
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">New Alerts</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">8</div>
-              <p className="text-xs text-muted-foreground">Require attention</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Verified Today</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">12</div>
-              <p className="text-xs text-muted-foreground">Confirmed matches</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">False Positives</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-600">3</div>
-              <p className="text-xs text-muted-foreground">Marked as incorrect</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+  const getStatusColor = (status: Alert['status']) => {
+    switch (status) {
+      case 'active': return 'bg-red-100 text-red-800';
+      case 'investigating': return 'bg-yellow-100 text-yellow-800';
+      case 'resolved': return 'bg-green-100 text-green-800';
+      case 'dismissed': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-        {/* Active Alerts */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+  const getTypeIcon = (type: Alert['type']) => {
+    switch (type) {
+      case 'unauthorized_entry': return AlertTriangle;
+      case 'rfid_failure': return Shield;
+      case 'suspicious_activity': return Eye;
+      case 'emergency': return AlertCircle;
+      case 'system_error': return XCircle;
+      default: return Bell;
+    }
+  };
+
+  const alertStats = {
+    total: alerts.length,
+    active: alerts.filter(a => a.status === 'active').length,
+    critical: alerts.filter(a => a.severity === 'critical').length,
+    resolved: alerts.filter(a => a.status === 'resolved').length
+  };
+
+  const handleStatusUpdate = (alertId: string, newStatus: Alert['status']) => {
+    setAlerts(prev => prev.map(alert => 
+      alert.id === alertId ? { ...alert, status: newStatus } : alert
+    ));
+  };
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Security Alerts</h1>
+            <p className="text-muted-foreground">
+              Monitor and manage security incidents and unauthorized access attempts
+            </p>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
-            <CardHeader>
-              <CardTitle>Real-time Alerts</CardTitle>
-              <CardDescription>
-                Latest detection alerts from the AI monitoring system
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Alerts</CardTitle>
+              <Bell className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {alerts.map((alert) => (
-                  <motion.div
-                    key={alert.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-start space-x-4">
-                      {/* Placeholder for detection image */}
-                      <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <Eye className="h-6 w-6 text-gray-400" />
+              <div className="text-2xl font-bold">{alertStats.total}</div>
+              <p className="text-xs text-muted-foreground">Last 24 hours</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Alerts</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{alertStats.active}</div>
+              <p className="text-xs text-muted-foreground">Requires attention</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Critical Alerts</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-800" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-800">{alertStats.critical}</div>
+              <p className="text-xs text-muted-foreground">High priority</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Resolved</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{alertStats.resolved}</div>
+              <p className="text-xs text-muted-foreground">Successfully handled</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filter Alerts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search alerts..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Severity</label>
+                <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All severities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severities</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Status</label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="investigating">Investigating</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                    <SelectItem value="dismissed">Dismissed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Type</label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="unauthorized_entry">Unauthorized Entry</SelectItem>
+                    <SelectItem value="rfid_failure">RFID Failure</SelectItem>
+                    <SelectItem value="suspicious_activity">Suspicious Activity</SelectItem>
+                    <SelectItem value="emergency">Emergency</SelectItem>
+                    <SelectItem value="system_error">System Error</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Alerts List */}
+        <div className="space-y-4">
+          {filteredAlerts.map((alert, index) => {
+            const TypeIcon = getTypeIcon(alert.type);
+            
+            return (
+              <motion.div
+                key={alert.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card className={`${alert.severity === 'critical' ? 'border-red-500' : ''}`}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start space-x-3">
+                        <div className={`p-2 rounded-lg ${
+                          alert.severity === 'critical' ? 'bg-red-100' :
+                          alert.severity === 'high' ? 'bg-orange-100' :
+                          alert.severity === 'medium' ? 'bg-yellow-100' :
+                          'bg-blue-100'
+                        }`}>
+                          <TypeIcon className={`h-5 w-5 ${
+                            alert.severity === 'critical' ? 'text-red-600' :
+                            alert.severity === 'high' ? 'text-orange-600' :
+                            alert.severity === 'medium' ? 'text-yellow-600' :
+                            'text-blue-600'
+                          }`} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <CardTitle className="text-lg">{alert.title}</CardTitle>
+                            <Badge className={getSeverityColor(alert.severity)}>
+                              {alert.severity.toUpperCase()}
+                            </Badge>
+                            <Badge className={getStatusColor(alert.status)}>
+                              {alert.status.replace('_', ' ').toUpperCase()}
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-base mb-2">
+                            {alert.description}
+                          </CardDescription>
+                          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                            <div className="flex items-center space-x-1">
+                              <MapPin className="h-4 w-4" />
+                              <span>{alert.location}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{alert.timestamp.toLocaleString()}</span>
+                            </div>
+                            {alert.cameraId && (
+                              <div className="flex items-center space-x-1">
+                                <Camera className="h-4 w-4" />
+                                <span>{alert.cameraId}</span>
+                              </div>
+                            )}
+                            {alert.studentName && (
+                              <div className="flex items-center space-x-1">
+                                <Users className="h-4 w-4" />
+                                <span>{alert.studentName} ({alert.studentId})</span>
+                              </div>
+                            )}
+                          </div>
+                          {alert.actionTaken && (
+                            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                              <p className="text-sm text-green-800">
+                                <strong>Action Taken:</strong> {alert.actionTaken}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h3 className="font-semibold text-lg">{alert.personName}</h3>
-                            <p className="text-sm text-muted-foreground">Case: {alert.caseId}</p>
-                          </div>
-                          {getStatusBadge(alert.status)}
-                        </div>
-                        
-                        <div className="grid gap-2 text-sm text-muted-foreground">
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-2" />
-                            {alert.location}
-                          </div>
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            {alert.detectionTime}
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium">Confidence Score</span>
-                            <span className="text-sm font-medium">{alert.confidence}%</span>
-                          </div>
-                          <Progress value={alert.confidence} className="h-2" />
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-col space-y-2">
-                        <Button size="sm" variant="outline">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {alert.status === 'new' && (
+                      <div className="flex space-x-2">
+                        {alert.status === 'active' && (
                           <>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                              <CheckCircle className="h-4 w-4" />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStatusUpdate(alert.id, 'investigating')}
+                            >
+                              Investigate
                             </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
-                              <X className="h-4 w-4" />
+                            <Button
+                              size="sm"
+                              onClick={() => handleStatusUpdate(alert.id, 'resolved')}
+                            >
+                              Resolve
                             </Button>
                           </>
                         )}
+                        {alert.status === 'investigating' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleStatusUpdate(alert.id, 'resolved')}
+                          >
+                            Resolve
+                          </Button>
+                        )}
+                        {alert.cameraId && (
+                          <Button size="sm" variant="outline">
+                            <Camera className="h-4 w-4 mr-1" />
+                            View Camera
+                          </Button>
+                        )}
                       </div>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
+                  </CardHeader>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {filteredAlerts.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Bell className="h-12 w-12 text-muted-foreground mb-4" />
+              <CardTitle className="text-xl mb-2">No alerts found</CardTitle>
+              <CardDescription>
+                No alerts match your current filter criteria. Try adjusting your search or filters.
+              </CardDescription>
             </CardContent>
           </Card>
-        </motion.div>
-
-        {/* High Priority Alert */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Alert className="border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              <strong>High Priority:</strong> Multiple detections of Sarah Thompson in the downtown area. 
-              Confidence scores above 90%. Consider immediate field response.
-            </AlertDescription>
-          </Alert>
-        </motion.div>
+        )}
       </div>
     </Layout>
-  );
-}
-
-function AlertTriangle({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
-    </svg>
   );
 }

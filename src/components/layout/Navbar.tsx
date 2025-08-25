@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,24 +22,31 @@ export function Navbar() {
     switch (role) {
       case 'admin':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      case 'case_manager':
+      case 'hostel_director':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      case 'warden':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'investigator':
+      case 'deputy_warden':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'assistant_warden':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'floor_incharge':
+        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
   const getRoleDisplay = (role: string) => {
-    switch (role) {
-      case 'case_manager':
-        return 'Case Manager';
-      case 'investigator':
-        return 'Investigator';
-      default:
-        return role.charAt(0).toUpperCase() + role.slice(1);
-    }
+    const roleMap = {
+      admin: 'Administrator',
+      hostel_director: 'Hostel Director',
+      warden: 'Warden',
+      deputy_warden: 'Deputy Warden',
+      assistant_warden: 'Assistant Warden',
+      floor_incharge: 'Floor Incharge'
+    };
+    return roleMap[role as keyof typeof roleMap] || role.charAt(0).toUpperCase() + role.slice(1);
   };
 
   return (
@@ -54,13 +62,15 @@ export function Navbar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
+            className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent"
           >
-            TraceVision
+            HostelMS
           </motion.h1>
         </div>
 
         <div className="flex items-center space-x-4">
+          <ThemeToggle />
+          
           {user && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -89,11 +99,9 @@ export function Navbar() {
                       <p className="text-xs leading-none text-muted-foreground">
                         {user.email}
                       </p>
-                      {user.organization && (
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.organization}
-                        </p>
-                      )}
+                      <p className="text-xs leading-none text-muted-foreground">
+                        {getRoleDisplay(user.role)}
+                      </p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

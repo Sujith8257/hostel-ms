@@ -1,214 +1,253 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { ShimmerBadge } from '@/components/ui/shimmer-badge';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Highlighter } from "@/components/magicui/highlighter";
 import {
   Shield,
-  Search,
+  Building2,
   AlertTriangle,
-  Eye,
   Users,
-  MapPin,
+  Activity,
   CheckCircle,
   ArrowRight,
   Star,
-  Zap,
-  Globe
+  Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function LandingPage() {
   const features = [
     {
-      icon: Eye,
-      title: 'AI-Powered Detection',
-      description: 'Advanced facial recognition technology that analyzes camera feeds in real-time to detect missing persons.'
+      icon: Shield,
+      title: 'Advanced Security',
+      description: 'RFID access control, biometric authentication, and real-time monitoring to ensure only authorized individuals enter the hostel.'
     },
     {
       icon: AlertTriangle,
-      title: 'Real-Time Alerts',
-      description: 'Instant notifications when a potential match is detected, with confidence scoring and location data.'
+      title: 'Unauthorized Entry Detection',
+      description: 'AI-powered detection system that immediately alerts management when unauthorized persons attempt to enter hostel premises.'
     },
     {
-      icon: MapPin,
-      title: 'Geographic Tracking',
-      description: 'Interactive maps showing detection locations and camera coverage areas for better coordination.'
+      icon: Activity,
+      title: 'Real-Time Monitoring',
+      description: 'Live tracking of student entry/exit activities with comprehensive logs and instant notifications for suspicious behavior.'
     },
     {
       icon: Users,
-      title: 'Multi-Agency Support',
-      description: 'Collaborate between police departments, NGOs, and investigation teams with role-based access.'
+      title: 'Student Management',
+      description: 'Complete student database with room assignments, contact information, and attendance tracking for better administration.'
     },
     {
-      icon: Search,
-      title: 'Case Management',
-      description: 'Comprehensive case tracking system to manage missing persons reports and investigation progress.'
+      icon: Building2,
+      title: 'Room Management',
+      description: 'Efficient room allocation system with occupancy tracking, maintenance scheduling, and space optimization.'
     },
     {
       icon: CheckCircle,
-      title: 'Verification System',
-      description: 'Human verification workflow to confirm detections and mark false positives for accuracy.'
+      title: 'Visitor Control',
+      description: 'Secure visitor registration and tracking system with temporary access controls and host verification.'
     }
   ];
 
   const stats = [
-    { number: '500+', label: 'Missing Persons Found' },
-    { number: '1,200+', label: 'Active Cases' },
-    { number: '50+', label: 'Partner Agencies' },
-    { number: '99.2%', label: 'Detection Accuracy' }
+    {
+      icon: Users,
+      value: '1,247',
+      label: 'Students Managed',
+      change: '+12%'
+    },
+    {
+      icon: Building2,
+      value: '95%',
+      label: 'Room Occupancy',
+      change: '+3%'
+    },
+    {
+      icon: Shield,
+      value: '99.8%',
+      label: 'Security Uptime',
+      change: '+0.2%'
+    },
+    {
+      icon: Activity,
+      value: '24/7',
+      label: 'Monitoring',
+      change: 'Always On'
+    }
   ];
 
   const testimonials = [
     {
-      name: 'Detective Sarah Johnson',
-      role: 'Metropolitan Police',
-      content: 'TraceVision has revolutionized how we handle missing persons cases. The AI detection is incredibly accurate and has helped us reunite dozens of families.',
+      name: 'Dr. Rajesh Kumar',
+      role: 'Hostel Director',
+      content: 'HostelMS has revolutionized our security operations. The unauthorized entry detection has prevented several security incidents.',
       rating: 5
     },
     {
-      name: 'Maria Rodriguez',
-      role: 'Missing Persons NGO',
-      content: 'The real-time alerts and collaborative features have made our search efforts so much more effective. This platform is a game-changer.',
+      name: 'Ms. Priya Sharma',
+      role: 'Deputy Warden',
+      content: 'The real-time monitoring and alert system has made our job much easier. We can respond to incidents immediately.',
+      rating: 5
+    },
+    {
+      name: 'Mr. Amit Patel',
+      role: 'Assistant Warden',
+      content: 'Student management features are incredibly comprehensive. Room allocation and visitor tracking work seamlessly.',
       rating: 5
     }
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <motion.div 
+      {/* Header */}
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center space-x-2"
             >
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                TraceVision
+              <Building2 className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold text-foreground">
+                HostelMS
               </span>
             </motion.div>
             
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center space-x-4"
-            >
+            <div className="flex items-center space-x-4">
+              <Link to="/about">
+                <Button variant="ghost">About Us</Button>
+              </Link>
+              <ThemeToggle />
               <Link to="/login">
                 <Button variant="outline">Sign In</Button>
               </Link>
               <Link to="/signup">
                 <Button>Get Started</Button>
               </Link>
-            </motion.div>
+            </div>
           </div>
         </div>
-      </nav>
+      </header>
 
       {/* Hero Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <Badge className="mb-4 bg-blue-100 text-blue-800 hover:bg-blue-100">
-              <Zap className="w-3 h-3 mr-1" />
-              AI-Powered Missing Persons Detection
-            </Badge>
+      <section className="py-20 lg:py-32">
+        <div className="container mx-auto px-4">
+          <div className="text-center space-y-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <ShimmerBadge variant="shimmer" className="mb-4">
+                <Zap className="mr-1 h-3 w-3" />
+                Advanced Hostel Security System
+              </ShimmerBadge>
+              <h1 className="text-4xl lg:text-6xl font-bold tracking-tight text-foreground">
+                Secure Your Hostel with
+                <br />
+                Smart Technology
+              </h1>
+            </motion.div>
             
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              Reunite Families with{' '}
-              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Advanced AI Technology
+            {/* <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-xl text-muted-foreground max-w-3xl mx-auto"
+            > */}
+              Protect your hostel with our 
+              <Highlighter action="highlight" color="#87CEFA"> comprehensive</Highlighter>
+              management system that detects
+              <span className="block">
+                unauthorized entries, manages student access, and provides real-time security monitoring.
               </span>
-            </h1>
+
+            {/* </motion.p> */}
             
-            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              TraceVision uses cutting-edge facial recognition and real-time monitoring to help law enforcement 
-              agencies and NGOs locate missing persons faster and more effectively than ever before.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center"
+            >
               <Link to="/signup">
-                <Button size="lg" className="text-lg px-8 py-3">
-                  Start Detection <ArrowRight className="ml-2 h-5 w-5" />
+                <Button size="lg" className="w-full sm:w-auto">
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-3">
-                Watch Demo
+              <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                View Demo
               </Button>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
       {/* Stats Section */}
-      <section className="py-16 bg-blue-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8"
-          >
+      <section className="py-16 bg-muted/50">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
               <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
                 className="text-center"
               >
-                <div className="text-3xl md:text-4xl font-bold text-blue-600 mb-2">
-                  {stat.number}
+                <div className="flex justify-center mb-2">
+                  <stat.icon className="h-8 w-8 text-primary" />
                 </div>
-                <div className="text-gray-600 dark:text-gray-300">
-                  {stat.label}
-                </div>
+                <div className="text-3xl font-bold">{stat.value}</div>
+                <div className="text-sm text-muted-foreground">{stat.label}</div>
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">{stat.change}</div>
               </motion.div>
             ))}
-          </motion.div>
+          </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Powerful Features for Effective Search Operations
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Our comprehensive platform provides all the tools needed for modern missing persons investigations.
-            </p>
-          </motion.div>
-
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-3xl lg:text-4xl font-bold mb-4"
+            >
+              Complete Hostel Security Solution
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-lg text-muted-foreground max-w-2xl mx-auto"
+            >
+              Our comprehensive system provides everything you need to secure and manage your hostel operations effectively.
+            </motion.p>
+          </div>
+          
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
               <motion.div
                 key={feature.title}
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
               >
                 <Card className="h-full hover:shadow-lg transition-shadow">
                   <CardHeader>
-                    <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mb-4">
-                      <feature.icon className="h-6 w-6 text-blue-600" />
+                    <div className="flex items-center space-x-2">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <feature.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <CardTitle className="text-lg">{feature.title}</CardTitle>
                     </div>
-                    <CardTitle className="text-xl">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="text-base">
@@ -222,96 +261,46 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-20 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              How TraceVision Works
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Our AI-powered system works around the clock to help locate missing persons.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: '01',
-                title: 'Upload Missing Person Data',
-                description: 'Law enforcement agencies upload photos and details of missing persons to the secure platform.'
-              },
-              {
-                step: '02',
-                title: 'AI Monitoring & Detection',
-                description: 'Our AI system continuously analyzes camera feeds from partner locations using facial recognition.'
-              },
-              {
-                step: '03',
-                title: 'Alert & Verification',
-                description: 'When a match is detected, alerts are sent to relevant teams for verification and immediate action.'
-              }
-            ].map((step, index) => (
-              <motion.div
-                key={step.step}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-                className="text-center"
-              >
-                <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-6">
-                  {step.step}
-                </div>
-                <h3 className="text-xl font-semibold mb-4">{step.title}</h3>
-                <p className="text-gray-600 dark:text-gray-300">{step.description}</p>
-              </motion.div>
-            ))}
+      {/* Testimonials Section */}
+      <section className="py-20 bg-muted/50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-3xl lg:text-4xl font-bold mb-4"
+            >
+              Trusted by Hostel Management Teams
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-lg text-muted-foreground"
+            >
+              See what hostel administrators are saying about HostelMS
+            </motion.p>
           </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Trusted by Law Enforcement Worldwide
-            </h2>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-8">
+          
+          <div className="grid md:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
               <motion.div
                 key={testimonial.name}
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
               >
                 <Card>
                   <CardContent className="pt-6">
                     <div className="flex mb-4">
-                      {Array.from({ length: testimonial.rating }).map((_, i) => (
-                        <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
+                      {[...Array(testimonial.rating)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 fill-primary text-primary" />
                       ))}
                     </div>
-                    <p className="text-gray-600 dark:text-gray-300 mb-4 italic">
-                      "{testimonial.content}"
-                    </p>
+                    <p className="text-muted-foreground mb-4">"{testimonial.content}"</p>
                     <div>
-                      <div className="font-semibold">{testimonial.name}</div>
-                      <div className="text-sm text-gray-500">{testimonial.role}</div>
+                      <div className="font-medium">{testimonial.name}</div>
+                      <div className="text-sm text-muted-foreground">{testimonial.role}</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -322,80 +311,45 @@ export function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-20">
+        <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center bg-primary rounded-2xl p-12 text-primary-foreground"
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Ready to Help Find Missing Persons?
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4">
+              Ready to Secure Your Hostel?
             </h2>
-            <p className="text-xl mb-8 max-w-2xl mx-auto opacity-90">
-              Join law enforcement agencies and NGOs worldwide who trust TraceVision 
-              to help reunite families and bring missing persons home safely.
+            <p className="text-xl mb-8 text-primary-foreground/90">
+              Join hundreds of hostels already using HostelMS to protect their students and property.
             </p>
-            <Link to="/signup">
-              <Button size="lg" variant="secondary" className="text-lg px-8 py-3">
-                <Globe className="mr-2 h-5 w-5" />
-                Get Started Today
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/signup">
+                <Button size="lg" variant="secondary" className="w-full sm:w-auto">
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary">
+                Contact Sales
               </Button>
-            </Link>
+            </div>
           </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="p-2 bg-blue-600 rounded-lg">
-                  <Shield className="h-5 w-5 text-white" />
-                </div>
-                <span className="text-xl font-bold">TraceVision</span>
-              </div>
-              <p className="text-gray-400">
-                Advanced AI technology for missing persons detection and family reunification.
-              </p>
+      <footer className="bg-background border-t py-12">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="flex items-center space-x-2 mb-4 md:mb-0">
+              <Building2 className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold text-foreground">HostelMS</span>
             </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white">Features</a></li>
-                <li><a href="#" className="hover:text-white">Pricing</a></li>
-                <li><a href="#" className="hover:text-white">API</a></li>
-                <li><a href="#" className="hover:text-white">Documentation</a></li>
-              </ul>
+            <div className="text-sm text-muted-foreground">
+              © 2024 HostelMS. All rights reserved.
             </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">Support</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white">Help Center</a></li>
-                <li><a href="#" className="hover:text-white">Contact</a></li>
-                <li><a href="#" className="hover:text-white">Training</a></li>
-                <li><a href="#" className="hover:text-white">Status</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-400">
-                <li><a href="#" className="hover:text-white">About</a></li>
-                <li><a href="#" className="hover:text-white">Privacy</a></li>
-                <li><a href="#" className="hover:text-white">Terms</a></li>
-                <li><a href="#" className="hover:text-white">Security</a></li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-800 mt-12 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 TraceVision. All rights reserved. Built with care for missing persons worldwide.</p>
-            <p>Built by Narayana and Team for Capstone Project, KARE</p>
           </div>
         </div>
       </footer>

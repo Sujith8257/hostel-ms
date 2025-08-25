@@ -14,39 +14,57 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const DUMMY_USERS: User[] = [
   {
     id: '1',
-    name: 'Admin User',
-    email: 'admin@tracevision.com',
+    name: 'System Administrator',
+    email: 'admin@hostelms.com',
     role: 'admin',
-    organization: 'TraceVision HQ'
+    createdAt: new Date()
   },
   {
     id: '2',
-    name: 'Detective Sarah Johnson',
-    email: 'sarah.johnson@police.gov',
-    role: 'case_manager',
-    organization: 'City Police Department'
+    name: 'Dr. Rajesh Kumar',
+    email: 'director@hostelms.com',
+    role: 'hostel_director',
+    createdAt: new Date()
   },
   {
     id: '3',
-    name: 'Officer Mike Chen',
-    email: 'mike.chen@police.gov',
-    role: 'investigator',
-    organization: 'City Police Department'
+    name: 'Mr. Suresh Warden',
+    email: 'warden@hostelms.com',
+    role: 'warden',
+    createdAt: new Date()
   },
   {
     id: '4',
-    name: 'NGO Coordinator',
-    email: 'coordinator@missingpersons.org',
-    role: 'case_manager',
-    organization: 'Missing Persons NGO'
+    name: 'Ms. Priya Deputy',
+    email: 'deputy@hostelms.com',
+    role: 'deputy_warden',
+    createdAt: new Date()
+  },
+  {
+    id: '5',
+    name: 'Mr. Amit Assistant',
+    email: 'assistant@hostelms.com',
+    role: 'assistant_warden',
+    createdAt: new Date()
+  },
+  {
+    id: '6',
+    name: 'Ms. Kavya Floor',
+    email: 'floor@hostelms.com',
+    role: 'floor_incharge',
+    floorNumber: 2,
+    hostelBlock: 'Block A',
+    createdAt: new Date()
   }
 ];
 
 const DUMMY_PASSWORDS: Record<string, string> = {
-  'admin@tracevision.com': 'admin123',
-  'sarah.johnson@police.gov': 'police123',
-  'mike.chen@police.gov': 'officer123',
-  'coordinator@missingpersons.org': 'ngo123'
+  'admin@hostelms.com': 'admin123',
+  'director@hostelms.com': 'director123',
+  'warden@hostelms.com': 'warden123',
+  'deputy@hostelms.com': 'deputy123',
+  'assistant@hostelms.com': 'assistant123',
+  'floor@hostelms.com': 'floor123'
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -55,7 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for stored auth on mount
-    const storedUser = localStorage.getItem('tracevision_user');
+    const storedUser = localStorage.getItem('hostelms_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
@@ -71,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const foundUser = DUMMY_USERS.find(u => u.email === email);
     if (foundUser && DUMMY_PASSWORDS[email] === password) {
       setUser(foundUser);
-      localStorage.setItem('tracevision_user', JSON.stringify(foundUser));
+      localStorage.setItem('hostelms_user', JSON.stringify(foundUser));
       setIsLoading(false);
       return true;
     }
@@ -82,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('tracevision_user');
+    localStorage.removeItem('hostelms_user');
   };
 
   return (

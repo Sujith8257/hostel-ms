@@ -1,154 +1,192 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { RoleDashboard } from '@/components/RoleDashboard';
 import { PlaceholderPage } from '@/components/PlaceholderPage';
 import { LandingPage } from '@/pages/LandingPage';
-import { CasesPage } from '@/pages/CasesPage';
-import { AlertsPage } from '@/pages/AlertsPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
+import { AboutUsPage } from '@/pages/AboutUsPage';
+// Hostel Management Pages
+import { DashboardPage } from '@/pages/DashboardPage';
+import { AlertsPage } from '@/pages/AlertsPage';
 import './App.css';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          
-          {/* Protected Routes */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <RoleDashboard />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/cases" element={
-            <ProtectedRoute>
-              <CasesPage />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/alerts" element={
-            <ProtectedRoute>
-              <AlertsPage />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/missing-persons" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="Missing Persons Database"
-                description="Search and browse missing persons records"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Missing Persons' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/map" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="Detection Map"
-                description="Geographic view of detection locations and camera coverage"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Map View' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/analytics" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="Analytics & Reports"
-                description="System performance metrics and detection analytics"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Analytics' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/users" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="User Management"
-                description="Manage system users and permissions"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Admin', href: '/admin' },
-                  { title: 'User Management' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/settings" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="System Settings"
-                description="Configure system parameters and preferences"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Admin', href: '/admin' },
-                  { title: 'Settings' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/cameras" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="Camera Sources"
-                description="Manage camera feeds and monitoring locations"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Admin', href: '/admin' },
-                  { title: 'Camera Sources' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/ai-config" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="AI Model Configuration"
-                description="Configure AI detection models and parameters"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Admin', href: '/admin' },
-                  { title: 'AI Configuration' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/help" element={
-            <ProtectedRoute>
-              <PlaceholderPage 
-                title="Help & Support"
-                description="Documentation, FAQs, and support resources"
-                breadcrumbs={[
-                  { title: 'Dashboard', href: '/dashboard' },
-                  { title: 'Help' }
-                ]}
-              />
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/about" element={<AboutUsPage />} />
+            
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/students" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Student Management"
+                  description="Manage student registrations, room assignments, and access permissions"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Students' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/entries" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Entry/Exit Logs"
+                  description="Monitor real-time entry/exit activities and access logs"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Entry Logs' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/alerts" element={
+              <ProtectedRoute>
+                <AlertsPage />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/rooms" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Room Management"
+                  description="Manage room allocations, occupancy, and maintenance schedules"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Room Management' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/security" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Security Monitoring"
+                  description="Real-time security monitoring and unauthorized access detection"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Security' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/visitors" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Visitor Management"
+                  description="Register and track visitor access to hostel premises"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Visitors' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/reports" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Reports & Analytics"
+                  description="Generate detailed reports on hostel operations and security metrics"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Reports' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/staff" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Staff Management"
+                  description="Manage hostel staff, roles, and permissions"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Admin', href: '/admin' },
+                    { title: 'Staff Management' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/settings" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="System Settings"
+                  description="Configure hostel management system settings and preferences"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Admin', href: '/admin' },
+                    { title: 'Settings' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/access-control" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Access Control"
+                  description="Configure RFID readers, biometric scanners, and entry points"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Admin', href: '/admin' },
+                    { title: 'Access Control' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/notifications" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Notification Settings"
+                  description="Configure alert preferences and notification channels"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Admin', href: '/admin' },
+                    { title: 'Notifications' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/help" element={
+              <ProtectedRoute>
+                <PlaceholderPage 
+                  title="Help & Support"
+                  description="Documentation, user guides, and support resources"
+                  breadcrumbs={[
+                    { title: 'Dashboard', href: '/dashboard' },
+                    { title: 'Help' }
+                  ]}
+                />
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

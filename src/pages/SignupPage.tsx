@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, Loader2, ArrowLeft, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -55,40 +56,42 @@ export function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-background flex items-center justify-center p-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center space-y-6"
         >
-          <div className="p-4 bg-green-100 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
-            <UserPlus className="h-8 w-8 text-green-600" />
+          <div className="p-4 bg-green-100 dark:bg-green-900 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+            <UserPlus className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-bold text-foreground">
             Registration Submitted!
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 max-w-md">
+          <p className="text-muted-foreground max-w-md">
             Your registration request has been submitted for review. You will receive an email 
-            confirmation once your account has been approved by our administrators.
+            confirmation once your account has been approved by the hostel administrators.
           </p>
-          <Link to="/login">
-            <Button>Return to Login</Button>
-          </Link>
+          <Button asChild>
+            <Link to="/login">
+              Return to Login
+            </Link>
+          </Button>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       {/* Back to Home Button */}
       <div className="absolute top-6 left-6 z-10">
-        <Link to="/">
-          <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       {/* Main Card Container */}
@@ -96,39 +99,40 @@ export function SignupPage() {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-5xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-5xl"
       >
-        <div className="flex min-h-[600px]">
-          {/* Left Side - Signup Form */}
-          <div className="flex-1 p-8 flex flex-col justify-center">
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="max-w-md mx-auto w-full space-y-6"
-            >
-              {/* Logo and Title */}
-              <div className="text-center">
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="flex justify-center mb-4"
-                >
-                  <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg">
-                    <Shield className="h-8 w-8 text-white" />
-                  </div>
-                </motion.div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-                  Create Account
-                </h1>
-                <p className="text-gray-600 dark:text-gray-300 text-sm">
-                  Request access to the missing persons detection system
-                </p>
-              </div>
+        <Card className="overflow-hidden">
+          <div className="flex min-h-[600px]">
+            {/* Left Side - Signup Form */}
+            <div className="flex-1 p-8 flex flex-col justify-center">
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="max-w-md mx-auto w-full space-y-6"
+              >
+                {/* Logo and Title */}
+                <div className="text-center">
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="flex justify-center mb-4"
+                  >
+                    <div className="p-2 bg-primary rounded-xl shadow-lg">
+                      <Shield className="h-8 w-8 text-primary-foreground" />
+                    </div>
+                  </motion.div>
+                  <h1 className="text-2xl font-bold text-foreground mb-2">
+                    Join HostelMS
+                  </h1>
+                  <p className="text-muted-foreground text-sm">
+                    Request access to the hostel management system
+                  </p>
+                </div>
 
-              {/* Signup Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Signup Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -140,9 +144,9 @@ export function SignupPage() {
                   </motion.div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="name">
                       Full Name
                     </Label>
                     <Input
@@ -153,12 +157,11 @@ export function SignupPage() {
                       onChange={(e) => handleInputChange('name', e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="phone">
                       Phone Number
                     </Label>
                     <Input
@@ -169,13 +172,12 @@ export function SignupPage() {
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Label htmlFor="email">
                     Email Address
                   </Label>
                   <Input
@@ -186,13 +188,12 @@ export function SignupPage() {
                     onChange={(e) => handleInputChange('email', e.target.value)}
                     required
                     disabled={isLoading}
-                    className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="password">
                       Password
                     </Label>
                     <Input
@@ -203,12 +204,11 @@ export function SignupPage() {
                       onChange={(e) => handleInputChange('password', e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Label htmlFor="confirmPassword">
                       Confirm Password
                     </Label>
                     <Input
@@ -219,66 +219,67 @@ export function SignupPage() {
                       onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                       required
                       disabled={isLoading}
-                      className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="organization" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Organization
+                  <Label htmlFor="organization">
+                    Institution/Organization
                   </Label>
                   <Input
                     id="organization"
                     type="text"
-                    placeholder="Police Department, NGO, etc."
+                    placeholder="University, College, Educational Institute"
                     value={formData.organization}
                     onChange={(e) => handleInputChange('organization', e.target.value)}
                     required
                     disabled={isLoading}
-                    className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="role" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Label htmlFor="role">
                     Requested Role
                   </Label>
                   <Select onValueChange={(value) => handleInputChange('role', value)} disabled={isLoading}>
-                    <SelectTrigger className="h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    <SelectTrigger>
                       <SelectValue placeholder="Select your role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="case_manager">Case Manager</SelectItem>
-                      <SelectItem value="investigator">Investigator</SelectItem>
+                      <SelectItem value="hostel_director">Hostel Director</SelectItem>
+                      <SelectItem value="warden">Warden</SelectItem>
+                      <SelectItem value="deputy_warden">Deputy Warden</SelectItem>
+                      <SelectItem value="assistant_warden">Assistant Warden</SelectItem>
+                      <SelectItem value="floor_incharge">Floor Incharge</SelectItem>
                       <SelectItem value="admin">System Administrator</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="justification" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <Label htmlFor="justification">
                     Justification
                   </Label>
                   <Textarea
                     id="justification"
-                    placeholder="Please explain why you need access to this system..."
+                    placeholder="Please explain why you need access to the hostel management system..."
                     value={formData.justification}
                     onChange={(e) => handleInputChange('justification', e.target.value)}
                     required
                     disabled={isLoading}
-                    className="min-h-[80px] border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    className="min-h-[60px]"
                   />
                 </div>
 
                 <Button 
                   type="submit" 
-                  className="w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl"
+                  className="w-full"
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Submitting Request...
                     </>
                   ) : (
@@ -287,8 +288,8 @@ export function SignupPage() {
                 </Button>
 
                 <div className="text-center">
-                  <span className="text-sm text-gray-600">Already have an account? </span>
-                  <Link to="/login" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                  <span className="text-sm text-muted-foreground">Already have an account? </span>
+                  <Link to="/login" className="text-sm text-primary hover:text-primary/80 font-medium underline-offset-4 hover:underline">
                     Sign in here
                   </Link>
                 </div>
@@ -297,33 +298,33 @@ export function SignupPage() {
           </div>
 
           {/* Right Side - Illustration */}
-          <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-600 to-purple-600 relative overflow-hidden">
+          <div className="hidden lg:flex flex-1 bg-primary relative overflow-hidden">
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="flex-1 flex items-center justify-center p-12"
+              className="flex-1 flex items-center justify-center p-8"
             >
-              <div className="relative w-full max-w-md">
+              <div className="relative w-full max-w-xs">
                 <img
-                  src="https://i.ibb.co/c8r6gFs/4957136.jpg"
-                  alt="Join the Mission"
-                  className="w-full h-auto rounded-2xl shadow-2xl"
+                  src="https://images.unsplash.com/photo-1555854877-bab0e564b8d5?w=400&h=300&fit=crop&crop=center"
+                  alt="Join Our Hostel Management Team"
+                  className="w-full h-auto rounded-xl shadow-xl"
                 />
                 
                 {/* Overlay Content */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-2xl flex items-end p-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent rounded-xl flex items-end p-4">
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.8 }}
                     className="text-white"
                   >
-                    <h3 className="text-xl font-bold mb-2">
-                      Join Our Mission
+                    <h3 className="text-lg font-bold mb-1">
+                      Join Our Team
                     </h3>
-                    <p className="text-sm opacity-90">
-                      Help us reunite families and bring missing persons home safely through advanced technology and collaboration.
+                    <p className="text-xs opacity-90">
+                      Help us create a safe and secure hostel environment for students through modern management solutions.
                     </p>
                   </motion.div>
                 </div>
@@ -332,12 +333,13 @@ export function SignupPage() {
             
             {/* Background Pattern */}
             <div className="absolute inset-0 opacity-10">
-              <div className="absolute -right-16 -top-16 w-64 h-64 bg-white rounded-full"></div>
-              <div className="absolute -left-16 -bottom-16 w-48 h-48 bg-white rounded-full"></div>
+              <div className="absolute -right-12 -top-12 w-48 h-48 bg-primary-foreground rounded-full"></div>
+              <div className="absolute -left-12 -bottom-12 w-36 h-36 bg-primary-foreground rounded-full"></div>
             </div>
           </div>
         </div>
-      </motion.div>
-    </div>
+      </Card>
+    </motion.div>
+  </div>
   );
 }
