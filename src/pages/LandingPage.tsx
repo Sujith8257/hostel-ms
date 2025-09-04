@@ -175,12 +175,14 @@ export function LandingPage() {
             >
               <Link to="/signup">
                 <Button size="lg" className="w-full sm:w-auto">
-                  Start Free Trial
+                  Sign Up
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
               <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                View Demo
+                <Link to="/login">
+                  Sign In
+                </Link>
               </Button>
             </motion.div>
           </div>

@@ -1,110 +1,155 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User } from '@/types';
+import type { DbProfile } from '@/types/database-models';
+import { supabase } from '@/lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  profile: DbProfile | null;
+  session: Session | null;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName: string, role?: 'admin' | 'warden' | 'student') => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Dummy credentials for testing
-const DUMMY_USERS: User[] = [
-  {
-    id: '1',
-    name: 'System Administrator',
-    email: 'admin@hostelms.com',
-    role: 'admin',
-    createdAt: new Date()
-  },
-  {
-    id: '2',
-    name: 'Dr. Rajesh Kumar',
-    email: 'director@hostelms.com',
-    role: 'hostel_director',
-    createdAt: new Date()
-  },
-  {
-    id: '3',
-    name: 'Mr. Suresh Warden',
-    email: 'warden@hostelms.com',
-    role: 'warden',
-    createdAt: new Date()
-  },
-  {
-    id: '4',
-    name: 'Ms. Priya Deputy',
-    email: 'deputy@hostelms.com',
-    role: 'deputy_warden',
-    createdAt: new Date()
-  },
-  {
-    id: '5',
-    name: 'Mr. Amit Assistant',
-    email: 'assistant@hostelms.com',
-    role: 'assistant_warden',
-    createdAt: new Date()
-  },
-  {
-    id: '6',
-    name: 'Ms. Kavya Floor',
-    email: 'floor@hostelms.com',
-    role: 'floor_incharge',
-    floorNumber: 2,
-    hostelBlock: 'Block A',
-    createdAt: new Date()
-  }
-];
-
-const DUMMY_PASSWORDS: Record<string, string> = {
-  'admin@hostelms.com': 'admin123',
-  'director@hostelms.com': 'director123',
-  'warden@hostelms.com': 'warden123',
-  'deputy@hostelms.com': 'deputy123',
-  'assistant@hostelms.com': 'assistant123',
-  'floor@hostelms.com': 'floor123'
-};
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<DbProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth on mount
-    const storedUser = localStorage.getItem('hostelms_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        setUser(null);
+        setProfile(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const foundUser = DUMMY_USERS.find(u => u.email === email);
-    if (foundUser && DUMMY_PASSWORDS[email] === password) {
-      setUser(foundUser);
-      localStorage.setItem('hostelms_user', JSON.stringify(foundUser));
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        setIsLoading(false);
+        return;
+      }
+
+      if (profileData) {
+        setProfile(profileData as DbProfile);
+        // Convert profile to User format for backward compatibility
+        const userData: User = {
+          id: profileData.id,
+          user_id: profileData.user_id,
+          name: profileData.full_name,
+          email: profileData.email,
+          role: profileData.role as 'admin' | 'warden' | 'student',
+          createdAt: new Date(profileData.created_at),
+        };
+        setUser(userData);
+      }
+    } catch (err) {
+      console.error('Error in fetchUserProfile:', err);
+    } finally {
       setIsLoading(false);
-      return true;
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
-  const logout = () => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        await fetchUserProfile(data.user.id);
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Login error:', err);
+      return { success: false, error: 'An unexpected error occurred' };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (
+    email: string, 
+    password: string, 
+    fullName: string, 
+    role: 'admin' | 'warden' | 'student' = 'warden'
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: role,
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Signup error:', err);
+      return { success: false, error: 'An unexpected error occurred' };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('hostelms_user');
+    setProfile(null);
+    setSession(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

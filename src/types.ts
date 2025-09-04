@@ -1,10 +1,11 @@
-export type UserRole = 'admin' | 'hostel_director' | 'warden' | 'deputy_warden' | 'assistant_warden' | 'floor_incharge';
+export type UserRole = 'admin' | 'warden' | 'student';
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  organization?: string;
   hostelBlock?: string;
   floorNumber?: number;
   createdAt: Date;

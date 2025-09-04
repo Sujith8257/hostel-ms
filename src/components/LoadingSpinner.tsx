@@ -23,7 +23,7 @@ export function LoadingSpinner() {
           className="text-center"
         >
           <h2 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            TraceVision
+            HostelGuard
           </h2>
           <p className="text-muted-foreground">Loading...</p>
         </motion.div>

@@ -28,11 +28,11 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
     
-    const success = await login(email, password);
-    if (success) {
+    const result = await login(email, password);
+    if (result.success) {
       // Navigation will happen automatically via useEffect
     } else {
-      setError('Invalid email or password');
+      setError(result.error || 'Invalid email or password');
     }
   };
 
@@ -44,21 +44,15 @@ export function LoginPage() {
       variant: 'destructive' as const
     },
     { 
-      email: 'director@hostelms.com', 
-      password: 'director123', 
-      role: 'Hostel Director', 
-      variant: 'secondary' as const
-    },
-    { 
       email: 'warden@hostelms.com', 
       password: 'warden123', 
       role: 'Warden', 
       variant: 'default' as const
     },
     { 
-      email: 'assistant@hostelms.com', 
-      password: 'assistant123', 
-      role: 'Assistant Warden', 
+      email: 'student@hostelms.com', 
+      password: 'student123', 
+      role: 'Student', 
       variant: 'outline' as const
     },
   ];

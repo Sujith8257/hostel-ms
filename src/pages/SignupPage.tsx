@@ -6,18 +6,20 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Shield, Loader2, ArrowLeft, UserPlus } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function SignupPage() {
+  const { signup } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
     organization: '',
-    role: '',
+    role: 'warden' as 'admin' | 'warden' | 'student',
     justification: '',
     phone: ''
   });
@@ -26,7 +28,11 @@ export function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field === 'role') {
+      setFormData(prev => ({ ...prev, [field]: value as 'admin' | 'warden' | 'student' }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,11 +53,26 @@ export function SignupPage() {
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
+    if (!formData.role) {
+      setError('Please select a role');
       setIsLoading(false);
-      setSuccess(true);
-    }, 2000);
+      return;
+    }
+
+    try {
+      const result = await signup(formData.email, formData.password, formData.name, formData.role);
+      
+      if (result.success) {
+        setSuccess(true);
+      } else {
+        setError(result.error || 'An error occurred during registration');
+      }
+    } catch (err) {
+      console.error('Signup error:', err);
+      setError('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (success) {
@@ -66,11 +87,11 @@ export function SignupPage() {
             <UserPlus className="h-8 w-8 text-green-600 dark:text-green-400" />
           </div>
           <h2 className="text-2xl font-bold text-foreground">
-            Registration Submitted!
+            Registration Successful!
           </h2>
           <p className="text-muted-foreground max-w-md">
-            Your registration request has been submitted for review. You will receive an email 
-            confirmation once your account has been approved by the hostel administrators.
+            Your account has been created successfully. Please check your email to verify your account 
+            before logging in. You may also need to wait for admin approval depending on your role.
           </p>
           <Button asChild>
             <Link to="/login">
@@ -247,12 +268,9 @@ export function SignupPage() {
                       <SelectValue placeholder="Select your role" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="hostel_director">Hostel Director</SelectItem>
                       <SelectItem value="warden">Warden</SelectItem>
-                      <SelectItem value="deputy_warden">Deputy Warden</SelectItem>
-                      <SelectItem value="assistant_warden">Assistant Warden</SelectItem>
-                      <SelectItem value="floor_incharge">Floor Incharge</SelectItem>
                       <SelectItem value="admin">System Administrator</SelectItem>
+                      <SelectItem value="student">Student</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
