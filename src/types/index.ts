@@ -1,9 +1,11 @@
+export type UserRole = 'admin' | 'hostel_director' | 'warden' | 'deputy_warden' | 'assistant_warden' | 'caretaker' | 'student' | 'case_manager' | 'investigator';
+
 export interface User {
   id: string;
   user_id?: string;
   name: string;
   email: string;
-  role: 'admin' | 'warden' | 'student';
+  role: UserRole;
   organization?: string;
   hostelName?: string;
   floorNumber?: number; // For floor incharges
@@ -16,7 +18,7 @@ export interface Profile {
   user_id: string;
   full_name: string;
   email: string;
-  role: 'admin' | 'warden' | 'student';
+  role: UserRole;
   created_at: string;
   updated_at: string;
 }

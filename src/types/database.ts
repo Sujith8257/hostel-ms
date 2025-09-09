@@ -7,7 +7,7 @@ export interface Database {
           user_id: string
           full_name: string
           email: string
-          role: 'admin' | 'warden' | 'student'
+          role: 'admin' | 'hostel_director' | 'warden' | 'deputy_warden' | 'assistant_warden' | 'caretaker' | 'student' | 'case_manager' | 'investigator'
           created_at: string
           updated_at: string
         }

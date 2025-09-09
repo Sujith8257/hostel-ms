@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { DbStudent, DbEntryLog, DbAlert, DbProfile } from '@/types/database-models';
+import type { UserRole } from '@/types';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // Student Management
@@ -207,7 +208,7 @@ export const profileService = {
     return data;
   },
 
-  async updateProfile(userId: string, updates: { full_name?: string; role?: 'admin' | 'warden' | 'student' }): Promise<DbProfile> {
+  async updateProfile(userId: string, updates: { full_name?: string; role?: UserRole }): Promise<DbProfile> {
     const { data, error } = await supabase
       .from('profiles')
       .update(updates)

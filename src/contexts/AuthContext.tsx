@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User } from '@/types';
+import type { User, UserRole } from '@/types';
 import type { DbProfile } from '@/types/database-models';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -9,7 +9,7 @@ interface AuthContextType {
   profile: DbProfile | null;
   session: Session | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string, fullName: string, role?: 'admin' | 'warden' | 'student') => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
@@ -69,10 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Convert profile to User format for backward compatibility
         const userData: User = {
           id: profileData.id,
-          user_id: profileData.user_id,
           name: profileData.full_name,
           email: profileData.email,
-          role: profileData.role as 'admin' | 'warden' | 'student',
+          role: profileData.role,
           createdAt: new Date(profileData.created_at),
         };
         setUser(userData);
@@ -113,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string, 
     password: string, 
     fullName: string, 
-    role: 'admin' | 'warden' | 'student' = 'warden'
+    role: UserRole = 'warden'
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
