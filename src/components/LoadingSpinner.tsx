@@ -23,9 +23,10 @@ export function LoadingSpinner() {
           className="text-center"
         >
           <h2 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            HostelGuard
+            HostelMS
           </h2>
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Management System</p>
+          <p className="text-sm text-muted-foreground mt-1">Loading...</p>
         </motion.div>
       </motion.div>
     </div>

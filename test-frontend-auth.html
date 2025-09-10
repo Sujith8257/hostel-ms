@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend Auth</title>
+</head>
+<body>
+    <h1>Frontend Authentication Test</h1>
+    <button id="testLogin">Test Login</button>
+    <button id="testRoomStats">Test Room Stats</button>
+    <div id="output"></div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001';
+        let currentToken = null;
+
+        document.getElementById('testLogin').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: '99220041542@klu.ac.in',
+                        password: 'klu123456'
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    currentToken = result.data.session.access_token;
+                    document.getElementById('output').innerHTML = '<p style="color: green;">Login successful! Token: ' + currentToken.substring(0, 50) + '...</p>';
+                } else {
+                    document.getElementById('output').innerHTML = '<p style="color: red;">Login failed: ' + result.error + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('output').innerHTML = '<p style="color: red;">Login error: ' + error.message + '</p>';
+            }
+        });
+
+        document.getElementById('testRoomStats').addEventListener('click', async () => {
+            if (!currentToken) {
+                document.getElementById('output').innerHTML = '<p style="color: red;">Please login first!</p>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/rooms/rooms/stats`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('output').innerHTML = '<p style="color: green;">Room stats: ' + JSON.stringify(result.data, null, 2) + '</p>';
+                } else {
+                    document.getElementById('output').innerHTML = '<p style="color: red;">Room stats failed: ' + result.error + '</p>';
+                }
+            } catch (error) {
+                document.getElementById('output').innerHTML = '<p style="color: red;">Room stats error: ' + error.message + '</p>';
+            }
+        });
+    </script>
+</body>
+</html>

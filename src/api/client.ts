@@ -253,8 +253,8 @@ export const caretakerApi = {
 
 // Room Management API
 export const roomApi = {
-  getRooms: (params?: { page?: number; limit?: number; building_id?: string; room_type?: string; room_status?: string }) =>
-    apiClient.get('/api/rooms/rooms', params),
+  getRooms: (params?: { page?: number; limit?: number; building_id?: string; room_type?: string; is_occupied?: boolean }) =>
+    apiClient.get('/api/rooms', params),
   
   getAllotments: (params?: { page?: number; limit?: number; building_id?: string }) =>
     apiClient.get('/api/rooms/allotments', params),
@@ -263,10 +263,10 @@ export const roomApi = {
     apiClient.get('/api/rooms/waiting-list', params),
   
   getRoomStats: () =>
-    apiClient.get('/api/rooms/rooms/stats'),
+    apiClient.get('/api/rooms/stats'),
   
   createRoom: (data: { building_id: string; room_number: string; floor_number: number; room_type: string; max_occupancy: number; amenities?: string[]; monthly_rent?: number }) =>
-    apiClient.post('/api/rooms/rooms', data),
+    apiClient.post('/api/rooms', data),
   
   allotRoom: (data: { room_id: string; student_id: string; notes?: string }) =>
     apiClient.post('/api/rooms/allotments', data),

@@ -53,10 +53,21 @@ export const roomController = {
       const { data: rooms, error, count } = await query;
 
       if (error) {
-        logger.error('Error fetching rooms:', error);
+        logger.error('Error fetching rooms:', {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          query_params: { building_id, floor_number, room_type, status, page, limit, search },
+          user_id: req.user?.id,
+          user_role: req.user?.profile?.role
+        });
         return res.status(400).json({
           success: false,
-          error: error.message
+          error: 'Failed to fetch rooms',
+          details: error.message,
+          code: error.code,
+          timestamp: new Date().toISOString()
         });
       }
 
@@ -77,10 +88,20 @@ export const roomController = {
         }
       });
     } catch (error) {
-      logger.error('Error in getRooms:', error);
+      logger.error('Error in getRooms:', {
+        error: error.message,
+        stack: error.stack,
+        query_params: req.query,
+        user_id: req.user?.id,
+        user_role: req.user?.profile?.role,
+        timestamp: new Date().toISOString()
+      });
       res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error while fetching rooms',
+        details: error.message,
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
       });
     }
   },
@@ -780,6 +801,32 @@ export const roomController = {
   // Get room occupancy statistics
   async getRoomStats(req, res) {
     try {
+      // Debug authentication
+      logger.info('getRoomStats called:', {
+        user_id: req.user?.id,
+        user_email: req.user?.email,
+        user_role: req.user?.profile?.role,
+        query_params: req.query,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      if (!req.user.profile) {
+        return res.status(401).json({
+          success: false,
+          error: 'User profile not found',
+          user_id: req.user.id,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       const { building_id } = req.query;
 
       let buildingFilter = '';
@@ -807,9 +854,21 @@ export const roomController = {
           .eq('is_active', true);
 
         if (roomError) {
+          logger.error('Error fetching room data for stats:', {
+            error: roomError.message,
+            code: roomError.code,
+            details: roomError.details,
+            hint: roomError.hint,
+            building_id,
+            user_id: req.user?.id,
+            timestamp: new Date().toISOString()
+          });
           return res.status(400).json({
             success: false,
-            error: roomError.message
+            error: 'Failed to fetch room data for statistics',
+            details: roomError.message,
+            code: roomError.code,
+            timestamp: new Date().toISOString()
           });
         }
 
@@ -841,10 +900,20 @@ export const roomController = {
         data: stats
       });
     } catch (error) {
-      logger.error('Error in getRoomStats:', error);
+      logger.error('Error in getRoomStats:', {
+        error: error.message,
+        stack: error.stack,
+        query_params: req.query,
+        user_id: req.user?.id,
+        user_role: req.user?.profile?.role,
+        timestamp: new Date().toISOString()
+      });
       res.status(500).json({
         success: false,
-        error: 'Internal server error'
+        error: 'Internal server error while fetching room statistics',
+        details: error.message,
+        timestamp: new Date().toISOString(),
+        requestId: req.headers['x-request-id'] || 'unknown'
       });
     }
   }

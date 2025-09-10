@@ -18,6 +18,7 @@ import associateWardenRoutes from './routes/associateWardenRoutes.js';
 import caretakerRoutes from './routes/caretakerRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
+import debugRoutes from './routes/debugRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -29,12 +30,12 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 
 // CORS configuration
-const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'],
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true,
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -69,6 +70,7 @@ app.use('/api/warden', wardenRoutes);
 app.use('/api/associate-warden', associateWardenRoutes);
 app.use('/api/caretaker', caretakerRoutes);
 app.use('/api/rooms', roomRoutes);
+app.use('/api/debug', debugRoutes);
 
 // 404 handler
 app.use(notFound);

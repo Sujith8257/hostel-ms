@@ -26,9 +26,16 @@ export function Navbar() {
     setIsLoggingOut(true);
     try {
       await logout();
+      // Logout function handles navigation, so no need to do anything here
     } catch (error) {
       console.error('Logout failed:', error);
-      setIsLoggingOut(false);
+      // Still try to clear the UI state and redirect
+      window.location.href = '/';
+    } finally {
+      // Only reset loading state if we're still on the same page
+      if (window.location.pathname !== '/') {
+        setIsLoggingOut(false);
+      }
     }
   };
 

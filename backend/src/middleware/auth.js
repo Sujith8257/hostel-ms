@@ -9,7 +9,8 @@ export const authenticate = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: 'Access denied. No token provided.'
+        error: 'Access denied. No token provided.',
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -17,9 +18,16 @@ export const authenticate = async (req, res, next) => {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     
     if (error || !user) {
+      logger.error('Token verification failed:', {
+        error: error?.message,
+        hasUser: !!user,
+        timestamp: new Date().toISOString()
+      });
       return res.status(401).json({
         success: false,
-        error: 'Invalid token'
+        error: 'Invalid token',
+        details: error?.message,
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -31,9 +39,55 @@ export const authenticate = async (req, res, next) => {
       .single();
 
     if (profileError || !profile) {
+      logger.error('Profile lookup failed:', {
+        userId: user.id,
+        userEmail: user.email,
+        profileError: profileError?.message,
+        profileCode: profileError?.code,
+        profileDetails: profileError?.details,
+        hasProfile: !!profile,
+        timestamp: new Date().toISOString()
+      });
+
+      // Let's check if there are any profiles at all
+      const { data: allProfiles, error: allProfilesError } = await supabase
+        .from('profiles')
+        .select('user_id, email, role, is_active, created_at')
+        .limit(5);
+
+      logger.info('Available profiles sample:', {
+        profileCount: allProfiles?.length || 0,
+        profiles: allProfiles,
+        allProfilesError: allProfilesError?.message,
+        timestamp: new Date().toISOString()
+      });
+
       return res.status(401).json({
         success: false,
-        error: 'User profile not found'
+        error: 'User profile not found',
+        details: {
+          userId: user.id,
+          userEmail: user.email,
+          profileError: profileError?.message,
+          profileCode: profileError?.code,
+          availableProfiles: allProfiles?.length || 0
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Check if profile is active
+    if (!profile.is_active) {
+      logger.warn('Inactive user attempted access:', {
+        userId: user.id,
+        userEmail: user.email,
+        profileRole: profile.role,
+        timestamp: new Date().toISOString()
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Account is not active. Please contact administrator.',
+        timestamp: new Date().toISOString()
       });
     }
 
@@ -43,12 +97,25 @@ export const authenticate = async (req, res, next) => {
       profile: profile
     };
 
+    logger.info('Authentication successful:', {
+      userId: user.id,
+      userEmail: user.email,
+      role: profile.role,
+      timestamp: new Date().toISOString()
+    });
+
     next();
   } catch (error) {
-    logger.error('Authentication error:', error);
+    logger.error('Authentication error:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     res.status(401).json({
       success: false,
-      error: 'Token verification failed'
+      error: 'Token verification failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 };

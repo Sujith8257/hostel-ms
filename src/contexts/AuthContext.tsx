@@ -17,7 +17,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -27,10 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        fetchUserProfile(session.user.id);
+        await fetchUserProfile(session.user.id);
       } else {
         setIsLoading(false);
       }
@@ -39,7 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] State change:', event, { hasSession: !!session, hasUser: !!session?.user });
+      
       setSession(session);
       if (session?.user) {
         await fetchUserProfile(session.user.id);
@@ -91,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       
       // Use backend API for login
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +104,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await response.json();
 
       if (!result.success) {
-        return { success: false, error: result.error };
+        setIsLoading(false);
+        return { success: false, error: result.error || 'Login failed' };
+      }
+
+      // Verify we have session data
+      if (!result.data?.session?.access_token) {
+        setIsLoading(false);
+        return { success: false, error: 'Invalid session data received' };
       }
 
       // Set session with Supabase client
@@ -112,15 +121,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (sessionError) {
+        console.error('Session set error:', sessionError);
+        setIsLoading(false);
         return { success: false, error: sessionError.message };
       }
 
+      // Fetch user profile directly to ensure state is properly set
+      await fetchUserProfile(result.data.user.id);
+      
       return { success: true };
     } catch (err) {
       console.error('Login error:', err);
-      return { success: false, error: 'An unexpected error occurred' };
-    } finally {
       setIsLoading(false);
+      return { success: false, error: 'Network error. Please check your connection.' };
     }
   };
 
@@ -137,7 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       
       // Use backend API for signup
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: 'No refresh token available' };
       }
 
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,43 +224,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Call backend logout
+      // Call backend logout first if we have a session
       const token = session?.access_token;
       if (token) {
         try {
-          await fetch(`${API_BASE_URL}/auth/logout`, {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
           });
+          // Don't check response status - logout should always succeed on frontend
         } catch (backendError) {
-          console.error('Backend logout error:', backendError);
-          // Continue with local logout even if backend fails
+          console.error('Backend logout error (continuing anyway):', backendError);
         }
       }
       
       // Clear Supabase session
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Supabase logout error:', error);
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('Supabase logout error (continuing anyway):', error);
+        }
+      } catch (supabaseError) {
+        console.error('Supabase logout error (continuing anyway):', supabaseError);
       }
       
-      // Clear local state
+      // Always clear local state regardless of API errors
       setUser(null);
       setProfile(null);
       setSession(null);
+      
+      // Clear any localStorage items
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('mock_user');
       
       // Force navigation to home page
       window.location.href = '/';
       
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('Logout error (continuing anyway):', err);
       // Force clear session even on error
       setUser(null);
       setProfile(null);
       setSession(null);
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('mock_user');
       window.location.href = '/';
     } finally {
       setIsLoading(false);

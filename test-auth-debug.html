@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        button { padding: 10px 15px; margin: 5px; }
+        .result { margin-top: 10px; padding: 10px; background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Debug Test</h1>
+    
+    <div class="test-section">
+        <h3>1. Test Login</h3>
+        <button onclick="testLogin()">Test Admin Login</button>
+        <div id="login-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>2. Test Logout</h3>
+        <button onclick="testLogout()">Test Logout</button>
+        <div id="logout-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>3. Test API Endpoints</h3>
+        <button onclick="testRoomStats()">Test Room Stats</button>
+        <div id="api-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>4. Current Auth State</h3>
+        <button onclick="checkAuthState()">Check Auth State</button>
+        <div id="auth-state" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001';
+        let currentToken = null;
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            try {
+                resultDiv.innerHTML = 'Testing login...';
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: '99220041542@klu.ac.in',
+                        password: 'klu123456'
+                    }),
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentToken = result.data.session.access_token;
+                    resultDiv.innerHTML = `<div class="success">✅ Login Success!</div>
+                        <div>User: ${result.data.user.email}</div>
+                        <div>Profile: ${result.data.profile.full_name}</div>
+                        <div>Role: ${result.data.profile.role}</div>
+                        <div>Token stored for testing</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Login Failed: ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testLogout() {
+            const resultDiv = document.getElementById('logout-result');
+            
+            if (!currentToken) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+            
+            try {
+                resultDiv.innerHTML = 'Testing logout...';
+                
+                const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `<div class="success">✅ Logout Success!</div>
+                        <div>Message: ${result.message}</div>`;
+                    currentToken = null;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Logout Failed: ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testRoomStats() {
+            const resultDiv = document.getElementById('api-result');
+            
+            if (!currentToken) {
+                resultDiv.innerHTML = '<div class="error">❌ No token available. Please login first.</div>';
+                return;
+            }
+            
+            try {
+                resultDiv.innerHTML = 'Testing room stats API...';
+                
+                const response = await fetch(`${API_BASE_URL}/api/rooms/stats`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (response.status === 404) {
+                    resultDiv.innerHTML = `<div class="error">❌ API endpoint not found (404). Check backend routes.</div>`;
+                    return;
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `<div class="success">✅ API Success!</div>
+                        <div>Data: ${JSON.stringify(result.data, null, 2)}</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ API Failed: ${result.error}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function checkAuthState() {
+            const resultDiv = document.getElementById('auth-state');
+            
+            try {
+                resultDiv.innerHTML = 'Checking auth state...';
+                
+                const sessionResponse = await fetch(`${API_BASE_URL}/api/auth/me`, {
+                    method: 'GET',
+                    headers: currentToken ? {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json',
+                    } : {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                const sessionResult = await sessionResponse.json();
+                
+                resultDiv.innerHTML = `
+                    <div><strong>Backend Auth State:</strong></div>
+                    <div>Has Token: ${currentToken ? '✅' : '❌'}</div>
+                    <div>API Response: ${sessionResult.success ? '✅' : '❌'}</div>
+                    <div>Status: ${sessionResponse.status}</div>
+                    <div>Result: ${JSON.stringify(sessionResult, null, 2)}</div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error checking auth state: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-check auth state on load
+        window.addEventListener('load', checkAuthState);
+    </script>
+</body>
+</html>

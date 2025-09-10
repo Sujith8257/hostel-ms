@@ -174,9 +174,10 @@ router.post('/login', async (req, res) => {
     }
 
     if (!profiles || profiles.length === 0) {
+      logger.warn('No profile found for user after login', { userId: data.user.id });
       return res.status(404).json({
         success: false,
-        error: 'User profile not found'
+        error: 'User profile not found. Please contact administrator.'
       });
     }
 
@@ -188,12 +189,25 @@ router.post('/login', async (req, res) => {
         profileCount: profiles.length 
       });
       
-      // Delete older duplicate profiles
+      // Delete older duplicate profiles in background
       const duplicateIds = profiles.slice(1).map(p => p.id);
-      await supabaseAdmin
-        .from('profiles')
-        .delete()
-        .in('id', duplicateIds);
+      setImmediate(async () => {
+        try {
+          await supabaseAdmin
+            .from('profiles')
+            .delete()
+            .in('id', duplicateIds);
+          logger.info('Cleaned up duplicate profiles', { 
+            userId: data.user.id, 
+            deletedCount: duplicateIds.length 
+          });
+        } catch (cleanupError) {
+          logger.error('Failed to cleanup duplicate profiles', { 
+            userId: data.user.id, 
+            error: cleanupError 
+          });
+        }
+      });
     }
 
     logger.info('User logged in successfully', { 
@@ -223,16 +237,28 @@ router.post('/login', async (req, res) => {
 // Logout endpoint
 router.post('/logout', async (req, res) => {
   try {
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      logger.error('Logout error', error);
-      return res.status(500).json({
-        success: false,
-        error: 'Error during logout'
-      });
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (token) {
+      // Verify the token and get user info before logout
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      
+      if (user && !userError) {
+        logger.info('User logging out', { 
+          userId: user.id, 
+          email: user.email 
+        });
+        
+        // Sign out the specific session
+        const { error } = await supabase.auth.admin.signOut(token);
+        
+        if (error) {
+          logger.warn('Supabase logout error (continuing anyway)', { error: error.message });
+        }
+      }
     }
 
+    // Always return success for logout to avoid UI issues
     res.json({
       success: true,
       message: 'Logged out successfully'
@@ -240,9 +266,10 @@ router.post('/logout', async (req, res) => {
 
   } catch (error) {
     logger.error('Logout error', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal server error'
+    // Still return success for logout
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
     });
   }
 });

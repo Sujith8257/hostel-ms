@@ -29,6 +29,7 @@ export function LoginPage() {
     setError('');
     
     const result = await login(email, password);
+    
     if (result.success) {
       // Navigation will happen automatically via useEffect
     } else {

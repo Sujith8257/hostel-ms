@@ -77,33 +77,33 @@ const waitingListQuerySchema = Joi.object({
 });
 
 // Room management routes (Admin, Hostel Director, Wardens)
-router.get('/rooms', 
+router.get('/', 
   authorize('admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden'),
   validateQuery(roomQuerySchema),
   roomController.getRooms
 );
 
-router.get('/rooms/available', 
+router.get('/available', 
   authorize('admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden'),
   validateQuery(roomQuerySchema),
   roomController.getAvailableRooms
 );
 
-router.post('/rooms', 
+router.get('/stats',
+  authorize('admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden'),
+  roomController.getRoomStats
+);
+
+router.post('/', 
   authorize('admin', 'hostel_director'),
   validate(createRoomSchema),
   roomController.createRoom
 );
 
-router.put('/rooms/:roomId', 
+router.put('/:roomId', 
   authorize('admin', 'hostel_director', 'warden'),
   validate(updateRoomSchema),
   roomController.updateRoom
-);
-
-router.get('/rooms/stats',
-  authorize('admin', 'hostel_director', 'warden', 'deputy_warden', 'assistant_warden'),
-  roomController.getRoomStats
 );
 
 // Room allotment routes
