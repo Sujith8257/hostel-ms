@@ -29,11 +29,13 @@
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.541.0",
     "motion": "^12.23.12",
+    "next-themes": "^0.4.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",
     "react-router-dom": "^7.8.2",
     "rough-notation": "^0.5.1",
+    "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.12",
     "zod": "^4.1.1"

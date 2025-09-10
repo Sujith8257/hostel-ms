@@ -30,6 +30,30 @@ router.put('/users/:id',
 
 router.delete('/users/:id', adminController.deleteUser);
 
+// Student management routes
+router.get('/students', 
+  validateQuery(paginationSchema), 
+  adminController.getStudents
+);
+
+// Building management routes
+router.get('/buildings', 
+  validateQuery(paginationSchema), 
+  adminController.getBuildings
+);
+
+// Student management routes
+router.get('/students', 
+  validateQuery(paginationSchema), 
+  adminController.getStudents
+);
+
+// Building management routes
+router.get('/buildings', 
+  validateQuery(paginationSchema), 
+  adminController.getBuildings
+);
+
 // System management routes
 router.get('/system-health', adminController.getSystemHealth);
 router.get('/audit-logs', adminController.getAuditLogs);

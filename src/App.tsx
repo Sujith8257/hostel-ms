@@ -10,7 +10,9 @@ import { AboutUsPage } from '@/pages/AboutUsPage';
 // Hostel Management Pages
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AlertsPage } from '@/pages/AlertsPage';
+import { RoomManagementPage } from '@/pages/RoomManagementPage';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
+import { Toaster } from "@/components/ui/sonner"
 import './App.css';
 
 function AppContent() {
@@ -67,14 +69,7 @@ function AppContent() {
         
         <Route path="/rooms" element={
           <ProtectedRoute>
-            <PlaceholderPage 
-              title="Room Management"
-              description="Manage room allocations, occupancy, and maintenance schedules"
-              breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Room Management' }
-              ]}
-            />
+            <RoomManagementPage />
           </ProtectedRoute>
         } />
         
@@ -195,6 +190,7 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <AppContent />
+        <Toaster />
       </AuthProvider>
     </ThemeProvider>
   );

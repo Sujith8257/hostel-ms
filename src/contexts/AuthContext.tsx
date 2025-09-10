@@ -209,25 +209,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async (): Promise<void> => {
     try {
+      setIsLoading(true);
+      
       // Call backend logout
       const token = session?.access_token;
       if (token) {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        try {
+          await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+        } catch (backendError) {
+          console.error('Backend logout error:', backendError);
+          // Continue with local logout even if backend fails
+        }
       }
-    } catch (err) {
-      console.error('Backend logout error:', err);
-    } finally {
-      // Always clear local session
-      await supabase.auth.signOut();
+      
+      // Clear Supabase session
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Supabase logout error:', error);
+      }
+      
+      // Clear local state
       setUser(null);
       setProfile(null);
       setSession(null);
+      
+      // Force navigation to home page
+      window.location.href = '/';
+      
+    } catch (err) {
+      console.error('Logout error:', err);
+      // Force clear session even on error
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      window.location.href = '/';
+    } finally {
+      setIsLoading(false);
     }
   };
 

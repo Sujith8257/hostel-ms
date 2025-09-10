@@ -17,6 +17,7 @@ import wardenRoutes from './routes/wardenRoutes.js';
 import associateWardenRoutes from './routes/associateWardenRoutes.js';
 import caretakerRoutes from './routes/caretakerRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import roomRoutes from './routes/roomRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -67,6 +68,7 @@ app.use('/api/director', directorRoutes);
 app.use('/api/warden', wardenRoutes);
 app.use('/api/associate-warden', associateWardenRoutes);
 app.use('/api/caretaker', caretakerRoutes);
+app.use('/api/rooms', roomRoutes);
 
 // 404 handler
 app.use(notFound);

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3001';
 
 // Helper to refresh token if needed
 const refreshTokenIfNeeded = async () => {
@@ -141,28 +141,28 @@ export const apiClient = new ApiClient(API_BASE_URL);
 // Auth API
 export const authApi = {
   login: (email: string, password: string) =>
-    apiClient.post('/auth/login', { email, password }),
+    apiClient.post('/api/auth/login', { email, password }),
   
   signup: (email: string, password: string, fullName: string, role?: string, phone?: string, organization?: string, justification?: string) =>
-    apiClient.post('/auth/signup', { email, password, fullName, role, phone, organization, justification }),
+    apiClient.post('/api/auth/signup', { email, password, fullName, role, phone, organization, justification }),
   
   logout: () =>
-    apiClient.post('/auth/logout'),
+    apiClient.post('/api/auth/logout'),
   
   refresh: (refreshToken: string) =>
-    apiClient.post('/auth/refresh', { refresh_token: refreshToken }),
+    apiClient.post('/api/auth/refresh', { refresh_token: refreshToken }),
   
   getCurrentUser: () =>
-    apiClient.get('/auth/me'),
+    apiClient.get('/api/auth/me'),
 };
 
 // Admin API
 export const adminApi = {
   getDashboard: () =>
-    apiClient.get('/admin/dashboard'),
+    apiClient.get('/api/admin/dashboard'),
   
   getUsers: (params?: { page?: number; limit?: number; role?: string; search?: string }) =>
-    apiClient.get('/admin/users', params),
+    apiClient.get('/api/admin/users', params),
   
   createUser: (userData: {
     full_name: string;
@@ -173,7 +173,7 @@ export const adminApi = {
     building_id?: string;
     floor_numbers?: number[];
   }) =>
-    apiClient.post('/admin/users', userData),
+    apiClient.post('/api/admin/users', userData),
   
   updateUser: (id: string, updates: Partial<{
     full_name: string;
@@ -182,67 +182,109 @@ export const adminApi = {
     phone: string;
     is_active: boolean;
   }>) =>
-    apiClient.put(`/admin/users/${id}`, updates),
+    apiClient.put(`/api/admin/users/${id}`, updates),
   
   deleteUser: (id: string) =>
-    apiClient.delete(`/admin/users/${id}`),
+    apiClient.delete(`/api/admin/users/${id}`),
   
   getSystemHealth: () =>
-    apiClient.get('/admin/system-health'),
+    apiClient.get('/api/admin/system-health'),
   
   getAuditLogs: (params?: { page?: number; limit?: number }) =>
-    apiClient.get('/admin/audit-logs', params),
+    apiClient.get('/api/admin/audit-logs', params),
   
   getPermissions: () =>
-    apiClient.get('/admin/permissions'),
+    apiClient.get('/api/admin/permissions'),
+  
+  getStudents: (params?: { page?: number; limit?: number; search?: string; hostel_status?: string }) =>
+    apiClient.get('/api/admin/students', params),
+  
+  getBuildings: (params?: { page?: number; limit?: number }) =>
+    apiClient.get('/api/admin/buildings', params),
 };
 
 // Director API
 export const directorApi = {
   getDashboard: () =>
-    apiClient.get('/director/dashboard'),
+    apiClient.get('/api/director/dashboard'),
   
   getHostels: () =>
-    apiClient.get('/director/hostels'),
+    apiClient.get('/api/director/hostels'),
   
   getStaff: () =>
-    apiClient.get('/director/staff'),
+    apiClient.get('/api/director/staff'),
 };
 
 // Warden API
 export const wardenApi = {
   getDashboard: () =>
-    apiClient.get('/warden/dashboard'),
+    apiClient.get('/api/warden/dashboard'),
   
   getStudents: () =>
-    apiClient.get('/warden/students'),
+    apiClient.get('/api/warden/students'),
   
   getAlerts: () =>
-    apiClient.get('/warden/alerts'),
+    apiClient.get('/api/warden/alerts'),
 };
 
 // Associate Warden API
 export const associateWardenApi = {
   getDashboard: () =>
-    apiClient.get('/associate-warden/dashboard'),
+    apiClient.get('/api/associate-warden/dashboard'),
   
   getFloors: () =>
-    apiClient.get('/associate-warden/floors'),
+    apiClient.get('/api/associate-warden/floors'),
   
   getAttendance: () =>
-    apiClient.get('/associate-warden/attendance'),
+    apiClient.get('/api/associate-warden/attendance'),
 };
 
 // Caretaker API
 export const caretakerApi = {
   getDashboard: () =>
-    apiClient.get('/caretaker/dashboard'),
+    apiClient.get('/api/caretaker/dashboard'),
   
   getTasks: () =>
-    apiClient.get('/caretaker/tasks'),
+    apiClient.get('/api/caretaker/tasks'),
   
   getMaintenance: () =>
-    apiClient.get('/caretaker/maintenance'),
+    apiClient.get('/api/caretaker/maintenance'),
+};
+
+// Room Management API
+export const roomApi = {
+  getRooms: (params?: { page?: number; limit?: number; building_id?: string; room_type?: string; room_status?: string }) =>
+    apiClient.get('/api/rooms/rooms', params),
+  
+  getAllotments: (params?: { page?: number; limit?: number; building_id?: string }) =>
+    apiClient.get('/api/rooms/allotments', params),
+  
+  getWaitingList: (params?: { page?: number; limit?: number; building_id?: string }) =>
+    apiClient.get('/api/rooms/waiting-list', params),
+  
+  getRoomStats: () =>
+    apiClient.get('/api/rooms/rooms/stats'),
+  
+  createRoom: (data: { building_id: string; room_number: string; floor_number: number; room_type: string; max_occupancy: number; amenities?: string[]; monthly_rent?: number }) =>
+    apiClient.post('/api/rooms/rooms', data),
+  
+  allotRoom: (data: { room_id: string; student_id: string; notes?: string }) =>
+    apiClient.post('/api/rooms/allotments', data),
+  
+  vacateRoom: (allotmentId: string, data: { notes?: string }) =>
+    apiClient.put(`/api/rooms/allotments/${allotmentId}/vacate`, data),
+  
+  transferRoom: (allotmentId: string, data: { new_room_id: string; notes?: string }) =>
+    apiClient.put(`/api/rooms/allotments/${allotmentId}/transfer`, data),
+  
+  addToWaitingList: (data: { student_id: string; preferred_building_id?: string; preferred_room_type?: string; preferred_floor?: string; priority_score?: number; notes?: string }) =>
+    apiClient.post('/api/rooms/waiting-list', data),
+  
+  removeFromWaitingList: (waitingListId: string) =>
+    apiClient.delete(`/api/rooms/waiting-list/${waitingListId}`),
+  
+  processWaitingList: (waitingListId: string, data: { room_id: string; notes?: string }) =>
+    apiClient.post(`/api/rooms/waiting-list/${waitingListId}/process`, data),
 };
 
 export default apiClient;

@@ -373,5 +373,81 @@ export const adminController = {
         error: 'Error fetching permissions'
       });
     }
+  },
+
+  // Get all students with pagination
+  async getStudents(req, res) {
+    try {
+      const { page = 1, limit = 50, search, hostel_status } = req.query;
+      
+      let query = supabaseAdmin
+        .from('students')
+        .select('*, building:hostel_buildings(name)', { count: 'exact' });
+
+      // Apply filters
+      if (hostel_status) {
+        query = query.eq('hostel_status', hostel_status);
+      }
+
+      if (search) {
+        query = query.or(`full_name.ilike.%${search}%,register_number.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+
+      const { data, error, count } = await query
+        .range(from, to)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({
+        success: true,
+        data,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: count,
+          totalPages: Math.ceil(count / limit)
+        }
+      });
+
+    } catch (error) {
+      logger.error('Get students error', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error fetching students'
+      });
+    }
+  },
+
+  // Get all buildings
+  async getBuildings(req, res) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('hostel_buildings')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({
+        success: true,
+        data
+      });
+
+    } catch (error) {
+      logger.error('Get buildings error', error);
+      res.status(500).json({
+        success: false,
+        error: 'Error fetching buildings'
+      });
+    }
   }
 };
