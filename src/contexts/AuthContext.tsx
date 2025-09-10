@@ -9,12 +9,15 @@ interface AuthContextType {
   profile: DbProfile | null;
   session: Session | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string, fullName: string, role?: UserRole) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName: string, role?: UserRole, phone?: string, organization?: string, justification?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<{ success: boolean; error?: string }>;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const API_BASE_URL = 'http://localhost:3001/api';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -36,10 +39,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user) {
-        fetchUserProfile(session.user.id);
+        await fetchUserProfile(session.user.id);
       } else {
         setUser(null);
         setProfile(null);
@@ -86,17 +89,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      
+      // Use backend API for login
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (error) {
-        return { success: false, error: error.message };
+      const result = await response.json();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
       }
 
-      if (data.user) {
-        await fetchUserProfile(data.user.id);
+      // Set session with Supabase client
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.data.session.access_token,
+        refresh_token: result.data.session.refresh_token,
+      });
+
+      if (sessionError) {
+        return { success: false, error: sessionError.message };
       }
 
       return { success: true };
@@ -112,23 +128,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string, 
     password: string, 
     fullName: string, 
-    role: UserRole = 'warden'
+    role: UserRole = 'warden',
+    phone?: string,
+    organization?: string,
+    justification?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: role,
-          },
+      
+      // Use backend API for signup
+      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          fullName, 
+          role, 
+          phone, 
+          organization, 
+          justification 
+        }),
       });
 
-      if (error) {
-        return { success: false, error: error.message };
+      const result = await response.json();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
       }
 
       return { success: true };
@@ -140,15 +168,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshToken = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession?.refresh_token) {
+        return { success: false, error: 'No refresh token available' };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      // Set new session
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.data.session.access_token,
+        refresh_token: result.data.session.refresh_token,
+      });
+
+      if (sessionError) {
+        return { success: false, error: sessionError.message };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Token refresh error:', err);
+      return { success: false, error: 'Failed to refresh token' };
+    }
+  };
+
   const logout = async (): Promise<void> => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
+    try {
+      // Call backend logout
+      const token = session?.access_token;
+      if (token) {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Backend logout error:', err);
+    } finally {
+      // Always clear local session
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, refreshToken, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

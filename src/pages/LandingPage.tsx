@@ -117,7 +117,7 @@ export function LandingPage() {
       {/* Header */}
       <header className={`border-b sticky top-0 z-50 transition-all duration-300 ${
         isScrolled 
-          ? 'bg-background/80 backdrop-blur-lg shadow-lg border-primary/20 mx-4 mt-8 rounded-2xl' 
+          ? 'bg-background/40 backdrop-blur-lg shadow-lg border-primary/20 mx-4 mt-8 pt-4 rounded-2xl' 
           : 'glass-effect'
       }`}>
         <div className="container mx-auto px-4 py-4">

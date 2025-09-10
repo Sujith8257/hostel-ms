@@ -10,181 +10,191 @@ import { AboutUsPage } from '@/pages/AboutUsPage';
 // Hostel Management Pages
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AlertsPage } from '@/pages/AlertsPage';
+import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import './App.css';
+
+function AppContent() {
+  // Initialize token refresh
+  useTokenRefresh();
+
+  return (
+    <Router>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/about" element={<AboutUsPage />} />
+        
+        {/* Protected Routes */}
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/students" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Student Management"
+              description="Manage student registrations, room assignments, and access permissions"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Students' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/entries" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Entry/Exit Logs"
+              description="Monitor real-time entry/exit activities and access logs"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Entry Logs' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/alerts" element={
+          <ProtectedRoute>
+            <AlertsPage />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/rooms" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Room Management"
+              description="Manage room allocations, occupancy, and maintenance schedules"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Room Management' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/security" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Security Monitoring"
+              description="Real-time security monitoring and unauthorized access detection"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Security' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/visitors" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Visitor Management"
+              description="Register and track visitor access to hostel premises"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Visitors' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/reports" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Reports & Analytics"
+              description="Generate detailed reports on hostel operations and security metrics"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Reports' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/staff" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Staff Management"
+              description="Manage hostel staff, roles, and permissions"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Admin', href: '/admin' },
+                { title: 'Staff Management' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/settings" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="System Settings"
+              description="Configure hostel management system settings and preferences"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Admin', href: '/admin' },
+                { title: 'Settings' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/access-control" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Access Control"
+              description="Configure RFID readers, biometric scanners, and entry points"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Admin', href: '/admin' },
+                { title: 'Access Control' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/notifications" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Notification Settings"
+              description="Configure alert preferences and notification channels"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Admin', href: '/admin' },
+                { title: 'Notifications' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/help" element={
+          <ProtectedRoute>
+            <PlaceholderPage 
+              title="Help & Support"
+              description="Documentation, user guides, and support resources"
+              breadcrumbs={[
+                { title: 'Dashboard', href: '/dashboard' },
+                { title: 'Help' }
+              ]}
+            />
+          </ProtectedRoute>
+        } />
+      </Routes>
+    </Router>
+  );
+}
 
 function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/about" element={<AboutUsPage />} />
-            
-            {/* Protected Routes */}
-            <Route path="/dashboard" element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/students" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Student Management"
-                  description="Manage student registrations, room assignments, and access permissions"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Students' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/entries" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Entry/Exit Logs"
-                  description="Monitor real-time entry/exit activities and access logs"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Entry Logs' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/alerts" element={
-              <ProtectedRoute>
-                <AlertsPage />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/rooms" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Room Management"
-                  description="Manage room allocations, occupancy, and maintenance schedules"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Room Management' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/security" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Security Monitoring"
-                  description="Real-time security monitoring and unauthorized access detection"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Security' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/visitors" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Visitor Management"
-                  description="Register and track visitor access to hostel premises"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Visitors' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/reports" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Reports & Analytics"
-                  description="Generate detailed reports on hostel operations and security metrics"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Reports' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin/staff" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Staff Management"
-                  description="Manage hostel staff, roles, and permissions"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Admin', href: '/admin' },
-                    { title: 'Staff Management' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin/settings" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="System Settings"
-                  description="Configure hostel management system settings and preferences"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Admin', href: '/admin' },
-                    { title: 'Settings' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin/access-control" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Access Control"
-                  description="Configure RFID readers, biometric scanners, and entry points"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Admin', href: '/admin' },
-                    { title: 'Access Control' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/admin/notifications" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Notification Settings"
-                  description="Configure alert preferences and notification channels"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Admin', href: '/admin' },
-                    { title: 'Notifications' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/help" element={
-              <ProtectedRoute>
-                <PlaceholderPage 
-                  title="Help & Support"
-                  description="Documentation, user guides, and support resources"
-                  breadcrumbs={[
-                    { title: 'Dashboard', href: '/dashboard' },
-                    { title: 'Help' }
-                  ]}
-                />
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
+        <AppContent />
       </AuthProvider>
     </ThemeProvider>
   );
