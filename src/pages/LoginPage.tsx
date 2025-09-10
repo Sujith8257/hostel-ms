@@ -38,22 +38,32 @@ export function LoginPage() {
 
     const testCredentials = [
     { 
-      email: 'admin@hostelms.com', 
-      password: 'admin123', 
+      email: '99220041542@klu.ac.in', 
+      password: 'klu123456', 
       role: 'Administrator', 
-      variant: 'destructive' as const
+      variant: 'destructive' as const,
+      name: 'Admin User 41542'
     },
     { 
-      email: 'warden@hostelms.com', 
-      password: 'warden123', 
+      email: '99220041552@klu.ac.in', 
+      password: 'klu123456', 
       role: 'Warden', 
-      variant: 'default' as const
+      variant: 'default' as const,
+      name: 'Warden User 41552'
     },
     { 
-      email: 'student@hostelms.com', 
-      password: 'student123', 
+      email: '99220041565@klu.ac.in', 
+      password: 'klu123456', 
+      role: 'Warden', 
+      variant: 'default' as const,
+      name: 'Warden User 41565'
+    },
+    { 
+      email: '99220041512@klu.ac.in', 
+      password: 'klu123456', 
       role: 'Student', 
-      variant: 'outline' as const
+      variant: 'outline' as const,
+      name: 'Student User 41512'
     },
   ];
 
@@ -198,7 +208,7 @@ export function LoginPage() {
                     <CardHeader className="pb-2">
                       <CardTitle className="text-xs flex items-center">
                         <Shield className="h-3 w-3 mr-1" />
-                        Demo Accounts - Quick Login
+                        KLU Demo Accounts - Quick Login
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
@@ -208,13 +218,16 @@ export function LoginPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => quickLogin(cred)}
-                          className="w-full justify-between"
+                          className="w-full justify-between text-left"
                         >
-                          <div className="flex items-center space-x-2">
-                            <Badge variant={cred.variant} className="text-xs">
-                              {cred.role}
-                            </Badge>
-                            <span className="text-xs">{cred.email}</span>
+                          <div className="flex flex-col items-start space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant={cred.variant} className="text-xs">
+                                {cred.role}
+                              </Badge>
+                              <span className="text-xs font-medium">{cred.name}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{cred.email}</span>
                           </div>
                           <span className="text-xs text-primary">Use</span>
                         </Button>

@@ -38,32 +38,68 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Create profile in database
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Create or update profile in database
+    const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
-      .insert({
-        user_id: authData.user.id,
-        email: email,
-        full_name: fullName,
-        role: role,
-        phone: phone,
-        organization: organization,
-        justification: justification,
-        is_active: role === 'warden' ? true : false, // Auto-approve wardens, others need admin approval
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
+      .select('id')
+      .eq('user_id', authData.user.id)
       .single();
 
-    if (profileError) {
-      logger.error('Profile creation error after signup', { userId: authData.user.id, error: profileError });
-      // Try to delete the auth user if profile creation failed
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-      return res.status(500).json({
-        success: false,
-        error: 'Error creating user profile'
-      });
+    let profile;
+    if (existingProfile) {
+      // Update existing profile
+      const { data: updatedProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          role: role,
+          phone: phone,
+          organization: organization,
+          justification: justification,
+          is_active: role === 'warden' ? true : false,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', authData.user.id)
+        .select()
+        .single();
+
+      if (profileError) {
+        logger.error('Profile update error after signup', { userId: authData.user.id, error: profileError });
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        return res.status(500).json({
+          success: false,
+          error: 'Error updating user profile'
+        });
+      }
+      profile = updatedProfile;
+    } else {
+      // Create new profile
+      const { data: newProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert({
+          user_id: authData.user.id,
+          email: email,
+          full_name: fullName,
+          role: role,
+          phone: phone,
+          organization: organization,
+          justification: justification,
+          is_active: role === 'warden' ? true : false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (profileError) {
+        logger.error('Profile creation error after signup', { userId: authData.user.id, error: profileError });
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        return res.status(500).json({
+          success: false,
+          error: 'Error creating user profile'
+        });
+      }
+      profile = newProfile;
     }
 
     logger.info('User signed up successfully', { 
@@ -115,19 +151,49 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Get user profile (handle potential duplicates)
+    const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('user_id', data.user.id)
-      .single();
+      .order('updated_at', { ascending: false });
 
     if (profileError) {
-      logger.error('Profile fetch error after login', { userId: data.user.id, error: profileError });
+      logger.error('Profile fetch error after login', { 
+        userId: data.user.id, 
+        error: profileError,
+        errorCode: profileError.code,
+        errorMessage: profileError.message,
+        errorDetails: profileError.details 
+      });
       return res.status(500).json({
         success: false,
-        error: 'Error fetching user profile'
+        error: 'Error fetching user profile',
+        debug: profileError.message
       });
+    }
+
+    if (!profiles || profiles.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'User profile not found'
+      });
+    }
+
+    // If there are multiple profiles, use the most recent one and clean up duplicates
+    const profile = profiles[0];
+    if (profiles.length > 1) {
+      logger.warn('Multiple profiles found for user, cleaning up', { 
+        userId: data.user.id, 
+        profileCount: profiles.length 
+      });
+      
+      // Delete older duplicate profiles
+      const duplicateIds = profiles.slice(1).map(p => p.id);
+      await supabaseAdmin
+        .from('profiles')
+        .delete()
+        .in('id', duplicateIds);
     }
 
     logger.info('User logged in successfully', { 
