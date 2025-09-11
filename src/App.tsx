@@ -12,6 +12,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { AlertsPage } from '@/pages/AlertsPage';
 import { RoomManagementPage } from '@/pages/RoomManagementPage';
 import { StudentsPage } from '@/pages/StudentsPage';
+import { EntryExitLogsPage } from '@/pages/EntryExitLogsPage';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { Toaster } from "@/components/ui/sonner"
 import './App.css';
@@ -44,14 +45,7 @@ function AppContent() {
         
         <Route path="/entries" element={
           <ProtectedRoute>
-            <PlaceholderPage 
-              title="Entry/Exit Logs"
-              description="Monitor real-time entry/exit activities and access logs"
-              breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Entry Logs' }
-              ]}
-            />
+            <EntryExitLogsPage />
           </ProtectedRoute>
         } />
         

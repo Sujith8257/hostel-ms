@@ -15,6 +15,19 @@ interface AuthContextType {
   isLoading: boolean;
 }
 
+// Narrow type for login response to avoid any
+interface BackendLoginResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    user?: { id: string; email?: string };
+    profile?: Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
+    session?: { access_token: string; refresh_token: string };
+  };
+}
+
+type MinimalProfile = Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE_URL = 'http://localhost:3001';
@@ -57,32 +70,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data: profileData, error } = await supabase
+      // Use ordering + limit instead of .single() to avoid failure when duplicates exist temporarily
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
       if (error) {
-        console.error('Error fetching profile:', error);
-        setIsLoading(false);
+        console.error('[Auth] Error fetching profile:', error);
         return;
       }
 
-      if (profileData) {
-        setProfile(profileData as DbProfile);
-        // Convert profile to User format for backward compatibility
-        const userData: User = {
-          id: profileData.id,
-          name: profileData.full_name,
-          email: profileData.email,
-          role: profileData.role,
-          createdAt: new Date(profileData.created_at),
-        };
-        setUser(userData);
+      const profileData = Array.isArray(data) ? data[0] : data;
+
+      if (!profileData) {
+        console.warn('[Auth] No profile found for user', userId);
+        return;
       }
+
+      setProfile(profileData as DbProfile);
+      // Map profile to User (ensure we use profileData.user_id for auth linkage but keep existing id usage for backwards compat)
+      const userData: User = {
+        id: profileData.id, // internal profile id (kept to avoid cascading changes)
+        name: profileData.full_name,
+        email: profileData.email,
+        role: profileData.role,
+        createdAt: new Date(profileData.created_at),
+      };
+      setUser(userData);
     } catch (err) {
-      console.error('Error in fetchUserProfile:', err);
+      console.error('[Auth] Exception in fetchUserProfile:', err);
     } finally {
       setIsLoading(false);
     }
@@ -91,47 +110,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      
-      // Use backend API for login
+      console.log('[Auth] Attempting login for', email);
+
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
       });
 
-      const result = await response.json();
+  let result: BackendLoginResponse = { success: false };
+      try {
+        result = await response.json();
+      } catch (parseError) {
+        console.error('[Auth] Failed to parse login response JSON', parseError);
+        setIsLoading(false);
+        return { success: false, error: 'Invalid server response' };
+      }
 
       if (!result.success) {
+        console.warn('[Auth] Login failed', result.error);
         setIsLoading(false);
         return { success: false, error: result.error || 'Login failed' };
       }
 
-      // Verify we have session data
-      if (!result.data?.session?.access_token) {
+      const sessionPayload = result.data?.session;
+      if (!sessionPayload?.access_token) {
+        console.error('[Auth] Missing access token in login response');
         setIsLoading(false);
         return { success: false, error: 'Invalid session data received' };
       }
 
-      // Set session with Supabase client
+      // Set Supabase session FIRST so subsequent queries are authenticated
       const { error: sessionError } = await supabase.auth.setSession({
-        access_token: result.data.session.access_token,
-        refresh_token: result.data.session.refresh_token,
+        access_token: sessionPayload.access_token,
+        refresh_token: sessionPayload.refresh_token,
       });
 
       if (sessionError) {
-        console.error('Session set error:', sessionError);
+        console.error('[Auth] Session set error', sessionError);
         setIsLoading(false);
         return { success: false, error: sessionError.message };
       }
 
-      // Fetch user profile directly to ensure state is properly set
-      await fetchUserProfile(result.data.user.id);
-      
+      // Immediately set user/profile from response to avoid extra round-trip + handle duplicate profiles scenario
+      if (result.data?.profile) {
+  setProfile(result.data.profile as DbProfile);
+  const profileData = result.data.profile as MinimalProfile;
+        const userData: User = {
+          id: profileData.id || result.data?.user?.id || 'unknown-user',
+          // NOTE: using profile row id; if you need auth user id elsewhere, consider adding a separate field
+          name: profileData.full_name || 'User',
+          email: profileData.email || result.data?.user?.email || 'unknown@example.com',
+          role: (profileData.role || 'warden') as UserRole, // default to warden to keep UI functional
+          createdAt: new Date(profileData.created_at || Date.now())
+        };
+        setUser(userData);
+        // We don't have the full Session type payload here; rely on supabase.auth.onAuthStateChange to populate
+        // Set loading false so UI (ProtectedRoute) can render dashboard
+        setIsLoading(false);
+      } else {
+        // Fallback: fetch explicitly if backend did not return profile and user id is present
+        if (result.data?.user?.id) {
+          await fetchUserProfile(result.data.user.id);
+        }
+      }
+
+      console.log('[Auth] Login successful, user state set');
       return { success: true };
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[Auth] Login error:', err);
       setIsLoading(false);
       return { success: false, error: 'Network error. Please check your connection.' };
     }
