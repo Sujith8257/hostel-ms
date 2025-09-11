@@ -16,342 +16,374 @@ import {
   TrendingUp,
   Camera,
   UserCheck,
-  Clock
+  Clock,
+  Building2,
+  Eye,
+  UserPlus,
+  BarChart3,
+  HelpCircle,
+  LogOut,
+  User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardData, useRecentActivity } from '@/hooks/useDashboardData';
+import { Link, useNavigate } from 'react-router-dom';
 
 export function AdminDashboard() {
-  const { user } = useAuth();
-  const { stats, isLoading, error } = useDashboardData();
-  const { activities } = useRecentActivity(4);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-  if (isLoading) {
-    return (
-      <Layout title="System Administration" breadcrumbs={[{ title: 'Admin Dashboard' }]}>
-        <div className="flex items-center justify-center h-64">
-          <LoadingSpinner />
-        </div>
-      </Layout>
-    );
-  }
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
 
-  if (error) {
-    return (
-      <Layout title="System Administration" breadcrumbs={[{ title: 'Admin Dashboard' }]}>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600">Error loading dashboard data: {error}</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  const systemStats = [
-    {
-      title: 'Total Students',
-      value: stats.totalStudents,
-      change: `${stats.activeStudents} active`,
-      icon: Users,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50'
-    },
-    {
-      title: 'Today\'s Entries',
-      value: stats.todayEntries,
-      change: `${stats.todayExits} exits`,
-      icon: Activity,
-      color: 'text-green-600',
-      bg: 'bg-green-50'
-    },
-    {
-      title: 'Pending Alerts',
-      value: stats.pendingAlerts,
-      change: `${stats.resolvedAlerts} resolved`,
-      icon: AlertTriangle,
-      color: 'text-orange-600',
-      bg: 'bg-orange-50'
-    },
-    {
-      title: 'Detection Accuracy',
-      value: `${stats.detectionAccuracy}%`,
-      change: 'AI Performance',
-      icon: TrendingUp,
-      color: 'text-purple-600',
-      bg: 'bg-purple-50'
-    },
+  const navigationItems = [
+    // Main Navigation
+    { name: 'Dashboard', icon: Activity, href: '/admin', current: true },
+    { name: 'Students', icon: Users, href: '/students' },
+    { name: 'Entry/Exit Logs', icon: Clock, href: '/entries' },
+    { name: 'Security Alerts', icon: AlertTriangle, href: '/alerts', badge: 2 },
+    { name: 'Room Management', icon: Building2, href: '/rooms' },
+    { name: 'Security Monitor', icon: Eye, href: '/security' },
+    { name: 'Visitor Management', icon: UserPlus, href: '/visitors' },
+    { name: 'Reports', icon: BarChart3, href: '/reports' },
   ];
 
-  const pendingRequests = [
-    {
-      id: '1',
-      name: 'Officer John Martinez',
-      email: 'j.martinez@police.gov',
-      role: 'investigator',
-      organization: 'Metro Police Dept.',
-      requestDate: '2024-08-24'
-    },
-    {
-      id: '2',
-      name: 'Sarah Wilson',
-      email: 's.wilson@helpingkids.org',
-      role: 'case_manager',
-      organization: 'Missing Kids NGO',
-      requestDate: '2024-08-23'
-    },
-    {
-      id: '3',
-      name: 'Detective Mike Brown',
-      email: 'm.brown@police.gov',
-      role: 'case_manager',
-      organization: 'City Police',
-      requestDate: '2024-08-22'
-    },
+  const adminItems = [
+    { name: 'Staff Management', icon: Users, href: '/admin/staff' },
+    { name: 'System Settings', icon: Settings, href: '/admin/settings' },
+    { name: 'Access Control', icon: Shield, href: '/admin/access-control' },
+    { name: 'Notifications', icon: AlertTriangle, href: '/admin/notifications' },
   ];
 
-  const systemHealth = [
-    { component: 'AI Processing Engine', status: 'healthy', load: 85 },
-    { component: 'Camera Network', status: 'warning', load: 92 },
-    { component: 'Database Cluster', status: 'healthy', load: 67 },
-    { component: 'Alert System', status: 'healthy', load: 43 },
+  const helpItems = [
+    { name: 'Help & Support', icon: HelpCircle, href: '/help' },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'healthy': return 'text-green-600 bg-green-50';
-      case 'warning': return 'text-yellow-600 bg-yellow-50';
-      case 'error': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
+  const stats = {
+    totalStudents: 1247,
+    presentStudents: 1156,
+    absentStudents: 91,
+    unauthorizedAttempts: 3,
+    activeAlerts: 2,
+    roomOccupancy: 92.4,
+    todayEntries: 856,
+    todayExits: 743
+  };
+
+  const recentAlerts = [
+    {
+      id: 1,
+      type: 'unauthorized_entry',
+      message: 'Unauthorized person detected at Block A entrance',
+      time: '5 minutes ago',
+      severity: 'high'
+    },
+    {
+      id: 2,
+      type: 'suspicious_activity',
+      message: 'Multiple failed RFID attempts at Block B',
+      time: '15 minutes ago',
+      severity: 'medium'
     }
+  ];
+
+  const getWelcomeMessage = () => {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    return `${greeting}, Administrator`;
   };
 
   return (
-    <Layout 
-      title="System Administration" 
-      breadcrumbs={[{ title: 'Admin Dashboard' }]}
-    >
-      <div className="space-y-6">
-        {/* Welcome Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-red-600 to-purple-600 text-white p-6 rounded-lg"
-        >
-          <div className="flex items-center space-x-3 mb-2">
-            <Shield className="h-8 w-8" />
-            <h2 className="text-2xl font-bold">
-              Welcome back, {user?.name}
-            </h2>
-          </div>
-          <p className="text-red-100">
-            System overview and administrative controls for TraceVision platform.
-          </p>
-        </motion.div>
+    <div className="min-h-screen bg-background">
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-64 bg-card border-r border-border">
+          <div className="p-6">
+            {/* Logo */}
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="p-2 bg-primary rounded-lg">
+                <Shield className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">HostelMS</h1>
+                <p className="text-sm text-muted-foreground">Hostel Management System</p>
+              </div>
+            </div>
 
-        {/* System Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
-        >
-          {systemStats.map((stat, index) => (
-            <motion.div
-              key={stat.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + index * 0.05 }}
-            >
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {stat.title}
-                  </CardTitle>
-                  <div className={`p-2 rounded-md ${stat.bg}`}>
-                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {stat.change}
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Pending User Requests */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Pending Access Requests</CardTitle>
-                    <CardDescription>
-                      New user registrations requiring approval
-                    </CardDescription>
-                  </div>
-                  <Badge variant="destructive">3</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {pendingRequests.map((request) => (
-                    <div key={request.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-medium">{request.name}</p>
-                        <p className="text-sm text-gray-500">{request.email}</p>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {request.role.replace('_', ' ')}
-                          </Badge>
-                          <span className="text-xs text-gray-500">{request.organization}</span>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                          <CheckCircle className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-red-600">
-                          ✕
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* System Health */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle>System Health Monitor</CardTitle>
-                <CardDescription>
-                  Real-time status of critical system components
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {systemHealth.map((component, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">{component.component}</span>
-                      <Badge className={getStatusColor(component.status)}>
-                        {component.status}
+            {/* Main Navigation */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Main Navigation
+              </h3>
+              <nav className="space-y-2">
+                {navigationItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      item.current
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                    {item.badge && (
+                      <Badge variant="destructive" className="ml-auto">
+                        {item.badge}
                       </Badge>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Progress value={component.load} className="flex-1 h-2" />
-                      <span className="text-xs text-gray-500 w-10">{component.load}%</span>
-                    </div>
-                  </div>
+                    )}
+                  </Link>
                 ))}
-              </CardContent>
-            </Card>
-          </motion.div>
+              </nav>
+            </div>
+
+            {/* Administration */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Administration
+              </h3>
+              <nav className="space-y-2">
+                {adminItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* Help & Support */}
+            <div className="mb-8">
+              <nav className="space-y-2">
+                {helpItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* User Info */}
+            <div className="mt-auto pt-6 border-t border-border">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-2 bg-muted rounded-lg">
+                  <User className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Admin User 41542</p>
+                  <p className="text-xs text-muted-foreground">Administrator</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="w-full justify-start"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Log out
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Quick Admin Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Administrative Actions</CardTitle>
-              <CardDescription>
-                Quick access to common administrative tasks
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button className="h-20 flex-col space-y-2" variant="outline">
-                  <Users className="h-6 w-6" />
-                  <span className="text-sm">Manage Users</span>
-                </Button>
-                <Button className="h-20 flex-col space-y-2" variant="outline">
-                  <Camera className="h-6 w-6" />
-                  <span className="text-sm">Camera Config</span>
-                </Button>
-                <Button className="h-20 flex-col space-y-2" variant="outline">
-                  <Database className="h-6 w-6" />
-                  <span className="text-sm">AI Models</span>
-                </Button>
-                <Button className="h-20 flex-col space-y-2" variant="outline">
-                  <Settings className="h-6 w-6" />
-                  <span className="text-sm">System Settings</span>
-                </Button>
+        {/* Main Content */}
+        <div className="flex-1">
+          {/* Header */}
+          <div className="bg-card border-b border-border px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">HostelMS</h1>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Recent Activity Log */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent System Activity</CardTitle>
-              <CardDescription>
-                Latest entry/exit logs and system events
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {activities.length > 0 ? (
-                  activities.map((activity) => (
-                    <div key={activity.id} className="flex items-center space-x-3 p-2 rounded-lg border">
-                      <div className={`p-1 rounded-full ${
-                        activity.entry_type === 'entry' ? 'bg-green-100' : 'bg-blue-100'
-                      }`}>
-                        {activity.entry_type === 'entry' ? 
-                          <UserCheck className="h-4 w-4 text-green-600" /> :
-                          <Activity className="h-4 w-4 text-blue-600" />
-                        }
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">
-                          {activity.entry_type === 'entry' ? 'Student Entry' : 'Student Exit'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {activity.student_name} ({activity.register_number}) at {activity.location}
-                        </p>
-                      </div>
-                      <div className="flex items-center text-xs text-gray-500">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {new Date(activity.timestamp).toLocaleTimeString()}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Activity className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                    <p>No recent activity</p>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1 bg-muted rounded-full">
+                    <User className="h-4 w-4" />
                   </div>
-                )}
+                  <Badge variant="secondary">Administrator</Badge>
+                  <span className="text-sm text-muted-foreground">AU4</span>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+            </div>
+          </div>
+
+          {/* Dashboard Content */}
+          <div className="p-6">
+            <div className="space-y-6">
+              {/* Welcome Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col md:flex-row justify-between items-start md:items-center"
+              >
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">{getWelcomeMessage()}</h1>
+                  <p className="text-muted-foreground">
+                    Welcome to the Hostel Management System dashboard
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 mt-4 md:mt-0">
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <Activity className="h-3 w-3" />
+                    System Online
+                  </Badge>
+                  <Badge variant={stats.activeAlerts > 0 ? "destructive" : "secondary"}>
+                    {stats.activeAlerts} Active Alerts
+                  </Badge>
+                </div>
+              </motion.div>
+
+              {/* Key Metrics */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+              >
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.totalStudents}</div>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="text-green-600 flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" />
+                        +2.5% from last month
+                      </span>
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Present Today</CardTitle>
+                    <UserCheck className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">{stats.presentStudents}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {((stats.presentStudents / stats.totalStudents) * 100).toFixed(1)}% attendance
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Room Occupancy</CardTitle>
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.roomOccupancy}%</div>
+                    <Progress value={stats.roomOccupancy} className="mt-2" />
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Security Alerts</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">{stats.unauthorizedAttempts}</div>
+                    <p className="text-xs text-muted-foreground">
+                      Unauthorized attempts today
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Recent Activity & Alerts */}
+              <div className="grid gap-6 md:grid-cols-2">
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Eye className="h-5 w-5" />
+                        Today's Activity
+                      </CardTitle>
+                      <CardDescription>Entry/Exit summary for today</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Total Entries</span>
+                        <Badge variant="outline">{stats.todayEntries}</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Total Exits</span>
+                        <Badge variant="outline">{stats.todayExits}</Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm">Currently Inside</span>
+                        <Badge variant="secondary">{stats.todayEntries - stats.todayExits}</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" />
+                        Recent Security Alerts
+                      </CardTitle>
+                      <CardDescription>Latest security notifications</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {recentAlerts.length > 0 ? (
+                        <div className="space-y-3">
+                          {recentAlerts.map((alert) => (
+                            <div key={alert.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                              <div className={`h-2 w-2 rounded-full mt-2 ${
+                                alert.severity === 'high' ? 'bg-red-500' : 
+                                alert.severity === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
+                              }`} />
+                              <div className="flex-1 space-y-1">
+                                <p className="text-sm font-medium">{alert.message}</p>
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {alert.time}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                          <Button variant="outline" size="sm" className="w-full">
+                            View All Alerts
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No recent alerts</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </Layout>
+    </div>
   );
 }

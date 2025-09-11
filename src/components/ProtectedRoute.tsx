@@ -10,6 +10,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, session, isLoading } = useAuth();
   const location = useLocation();
 
+  console.debug('[ProtectedRoute] State check', { 
+    isLoading, 
+    hasUser: !!user, 
+    hasSession: !!session, 
+    userRole: user?.role,
+    pathname: location.pathname 
+  });
+
   if (isLoading) {
     console.debug('[ProtectedRoute] isLoading=true, showing spinner', { pathname: location.pathname });
     return <LoadingSpinner />;

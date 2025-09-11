@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   profile: DbProfile | null;
   session: Session | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>;
   signup: (email: string, password: string, fullName: string, role?: UserRole, phone?: string, organization?: string, justification?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<{ success: boolean; error?: string }>;
@@ -28,6 +28,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Fallback timeout to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[Auth] Loading timeout reached, setting isLoading to false');
+        setLoading(false, 'timeout-fallback');
+      }
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, [isLoading]);
 
   // Small helper to keep track of loading toggles
   const setLoading = (value: boolean, reason: string) => {
@@ -94,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      console.info('[Auth] Fetching user profile for userId:', userId);
       // Use ordering + limit instead of .single() to avoid failure when duplicates exist temporarily
       const { data, error } = await supabase
         .from('profiles')
@@ -104,12 +117,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('[Auth] Error fetching profile:', error);
+        setLoading(false, 'fetchUserProfile:error');
         return;
       }
 
       const profileData = Array.isArray(data) ? data[0] : data;
       if (!profileData) {
         console.warn('[Auth] No profile found for user', userId);
+        setLoading(false, 'fetchUserProfile:no-profile');
         return;
       }
       setProfile(profileData as DbProfile);
@@ -122,14 +137,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date(profileData.created_at),
       };
       setUser(userData);
+      console.info('[Auth] User profile fetched and set', { user: userData });
     } catch (err) {
       console.error('[Auth] Exception in fetchUserProfile:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false, 'fetchUserProfile:finally');
     }
   };
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; role?: string }> => {
     try {
       setLoading(true, 'login:start');
       console.log('[Auth] Attempting login for', email);
@@ -140,6 +156,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email, password })
       });
       const result = await response.json();
+      console.info('[Auth] Backend login response:', { 
+        success: result.success, 
+        hasData: !!result.data, 
+        hasProfile: !!result.data?.profile,
+        hasUser: !!result.data?.user,
+        profileRole: result.data?.profile?.role,
+        userRole: result.data?.user?.role
+      });
+      
       if (!result.success) {
         setLoading(false, 'login:backend result.success=false');
         return { success: false, error: result.error || 'Login failed' };
@@ -171,30 +196,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Set user/profile from backend response
+      let userRole: string | undefined;
       if (result.data?.profile) {
         setProfile(result.data.profile as DbProfile);
         const profileData = result.data.profile;
+        userRole = profileData.role;
+        // Normalize role to 'admin' if it's 'administrator'
+        const normalizedRole = userRole === 'administrator' ? 'admin' : userRole;
         const userData: User = {
           id: profileData.id,
           name: profileData.full_name,
           email: profileData.email,
-          role: profileData.role as 'admin' | 'warden' | 'student',
+          role: normalizedRole as 'admin' | 'warden' | 'student',
           createdAt: new Date(profileData.created_at),
         };
         setUser(userData);
+        console.info('[Auth] User set from profile data', { user: userData, role: userRole, normalizedRole });
       } else if (result.data?.user?.id) {
+        console.info('[Auth] Fetching user profile from user ID');
         await fetchUserProfile(result.data.user.id);
       }
       setLoading(false, 'login:success');
-      // Force navigation to dashboard immediately after successful login
-      try {
-        console.info('[Auth] Login success, forcing redirect to /dashboard');
-        window.location.replace('/dashboard');
-      } catch (e) {
-        console.warn('[Auth] Redirect to /dashboard failed, falling back', e);
-        window.location.href = '/dashboard';
-      }
-      return { success: true };
+      console.info('[Auth] Login completed, returning success', { role: userRole });
+      // Do not hard-redirect here; let the LoginPage handle role-based navigation
+      return { success: true, role: userRole };
     } catch (err) {
       console.error('[Auth] Login error:', err);
       setLoading(false, 'login:exception');
