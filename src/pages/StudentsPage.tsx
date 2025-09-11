@@ -244,14 +244,29 @@ export function StudentsPage() {
 
   // Load data on component mount
   useEffect(() => {
-    loadData();
-    
-    // Fallback timeout to prevent infinite loading
-    const fallbackTimeout = setTimeout(() => {
-      if (isLoading) {
-        console.log('Fallback timeout triggered - forcing data load');
+    const loadDataWithFallback = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Try to load from API with timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 3000)
+        );
+        
+        const studentsData = await Promise.race([
+          studentService.getStudents(),
+          timeoutPromise
+        ]) as DbStudent[];
+        
+        console.log(`Loaded ${studentsData.length} students from database`);
+        setStudents(studentsData);
         setIsLoading(false);
-        // Load mock data as fallback
+      } catch (err) {
+        console.error('Error loading data:', err);
+        
+        // Fallback to mock data if API fails
+        console.log('Using fallback mock data');
         const mockStudents: DbStudent[] = [
           {
             id: '1',
@@ -280,14 +295,30 @@ export function StudentsPage() {
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
+          },
+          {
+            id: '3',
+            register_number: 'REG003',
+            full_name: 'Bob Johnson',
+            email: 'bob.johnson@example.com',
+            phone: '+1234567892',
+            hostel_status: 'resident',
+            room_number: 'B-205',
+            face_embedding: null,
+            profile_image_url: null,
+            is_active: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }
         ];
+        
         setStudents(mockStudents);
-        toast.info('Loaded demo data - API may be unavailable');
+        setIsLoading(false);
+        toast.info('Using demo data - API connection failed');
       }
-    }, 10000); // 10 second fallback
+    };
 
-    return () => clearTimeout(fallbackTimeout);
+    loadDataWithFallback();
   }, []);
 
   // Filter students when search term or filter changes
@@ -765,7 +796,7 @@ export function StudentsPage() {
             <div className="p-6">
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
-                  <LoadingSpinner />
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p className="text-muted-foreground mt-4">Loading students...</p>
                   <Button 
                     variant="outline" 
@@ -1062,12 +1093,7 @@ export function StudentsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
         >
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Student Management</h1>
-            <p className="text-muted-foreground">
-              Manage student registrations, room assignments, and access permissions
-            </p>
-          </div>
+
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
@@ -1739,8 +1765,8 @@ export function StudentsPage() {
             <div className="space-y-4">
               {isLoadingRooms ? (
                 <div className="text-center py-8">
-                  <LoadingSpinner />
-                  <p className="text-sm text-muted-foreground mt-2">Loading available rooms...</p>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Loading available rooms...</p>
                 </div>
               ) : (
                 <>

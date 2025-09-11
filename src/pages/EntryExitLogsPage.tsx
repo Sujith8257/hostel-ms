@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { 
   Activity, 
   Search, 
@@ -341,6 +340,7 @@ export function EntryExitLogsPage() {
               </div>
 
               {/* Main Navigation */}
+              
               <div className="mb-8">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
                   Main Navigation
@@ -430,7 +430,10 @@ export function EntryExitLogsPage() {
           {/* Main Content */}
           <div className="flex-1">
         <div className="flex items-center justify-center h-64">
-          <LoadingSpinner />
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading entry/exit logs...</p>
+          </div>
         </div>
           </div>
         </div>
@@ -652,7 +655,7 @@ export function EntryExitLogsPage() {
                 <div className="p-2 bg-muted rounded-lg">
                   <User className="h-4 w-4" />
                 </div>
-                <div>
+          <div>
                   <p className="text-sm font-medium">Admin User 41542</p>
                   <p className="text-xs text-muted-foreground">Administrator</p>
                 </div>
@@ -693,34 +696,23 @@ export function EntryExitLogsPage() {
 
           {/* Dashboard Content */}
           <div className="p-6">
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 mb-6">
+              <Button variant="outline" size="sm" onClick={loadLogs}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
+                <Eye className="h-4 w-4 mr-2" />
+                Face Recognition Dashboard
+              </Button>
+            </div>
+
       <div className="space-y-6">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-        >
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Entry/Exit Logs</h1>
-            <p className="text-muted-foreground">
-              Real-time face recognition entry and exit logs from the hostel management system
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={loadLogs}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
-              <Eye className="h-4 w-4 mr-2" />
-              Face Recognition Dashboard
-            </Button>
-          </div>
-        </motion.div>
 
         {/* Statistics Cards */}
         <motion.div
