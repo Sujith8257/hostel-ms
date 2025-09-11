@@ -5,6 +5,7 @@ import { PlaceholderPage } from '@/components/PlaceholderPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { HelpPage } from '@/pages/HelpPage';
 import { SecurityMonitoringPage } from '@/pages/SecurityMonitoringPage';
+import { VisitorManagementPage } from '@/pages/VisitorManagementPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -54,16 +55,7 @@ function AppContent() {
         
         <Route path="/security" element={<SecurityMonitoringPage />} />
         
-        <Route path="/visitors" element={
-          <PlaceholderPage 
-            title="Visitor Management"
-            description="Register and track visitor access to hostel premises"
-            breadcrumbs={[
-              { title: 'Dashboard', href: '/dashboard' },
-              { title: 'Visitors' }
-            ]}
-          />
-        } />
+        <Route path="/visitors" element={<VisitorManagementPage />} />
         
         <Route path="/reports" element={<ReportsPage />} />
         
