@@ -37,7 +37,7 @@ interface Room {
   room_number: string;
   building_id: string;
   floor_number: number;
-  room_type: 'single' | 'double' | 'triple' | 'dormitory';
+  room_type: '2_sharing' | '4_sharing' | '5_sharing';
   capacity: number;
   current_occupancy: number;
   status: 'available' | 'occupied' | 'maintenance' | 'reserved';
@@ -132,7 +132,7 @@ export function RoomManagementPage() {
     room_number: '',
     building_id: '',
     floor_number: 1,
-    room_type: 'double' as 'single' | 'double' | 'triple' | 'dormitory',
+    room_type: '2_sharing' as '2_sharing' | '4_sharing' | '5_sharing',
     capacity: 2,
     rent_amount: 0,
     amenities: [] as string[],
@@ -144,6 +144,9 @@ export function RoomManagementPage() {
     room_id: '',
     notes: ''
   });
+
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [waitingListStudentSearchTerm, setWaitingListStudentSearchTerm] = useState('');
 
   const [waitingListForm, setWaitingListForm] = useState({
     student_id: '',
@@ -295,7 +298,7 @@ export function RoomManagementPage() {
           room_number: '',
           building_id: '',
           floor_number: 1,
-          room_type: 'double',
+          room_type: '2_sharing',
           capacity: 2,
           rent_amount: 0,
           amenities: [],
@@ -321,6 +324,7 @@ export function RoomManagementPage() {
         toast.success('Room allotted successfully');
         setShowAllotRoom(false);
         setAllotmentForm({ student_id: '', room_id: '', notes: '' });
+        setStudentSearchTerm('');
         fetchAllotments();
         fetchRooms();
         fetchRoomStats();
@@ -331,6 +335,35 @@ export function RoomManagementPage() {
       console.error('Error allotting room:', error);
       toast.error('Failed to allot room');
     }
+  };
+
+  // Fuzzy search function for students
+  const fuzzySearchStudents = (searchTerm: string, students: Student[]) => {
+    if (!searchTerm.trim()) {
+      return students.filter(s => s.hostel_status === 'day_scholar');
+    }
+    
+    const term = searchTerm.toLowerCase();
+    return students.filter(s => 
+      s.hostel_status === 'day_scholar' && (
+        s.full_name.toLowerCase().includes(term) ||
+        s.register_number.toLowerCase().includes(term) ||
+        s.email.toLowerCase().includes(term)
+      )
+    ).sort((a, b) => {
+      // Prioritize exact matches at the beginning
+      const aNameMatch = a.full_name.toLowerCase().startsWith(term);
+      const bNameMatch = b.full_name.toLowerCase().startsWith(term);
+      const aRegMatch = a.register_number.toLowerCase().startsWith(term);
+      const bRegMatch = b.register_number.toLowerCase().startsWith(term);
+      
+      if (aNameMatch && !bNameMatch) return -1;
+      if (!aNameMatch && bNameMatch) return 1;
+      if (aRegMatch && !bRegMatch) return -1;
+      if (!aRegMatch && bRegMatch) return 1;
+      
+      return a.full_name.localeCompare(b.full_name);
+    });
   };
 
   const handleVacateRoom = async (allotmentId: string) => {
@@ -399,6 +432,7 @@ export function RoomManagementPage() {
           priority_score: 0,
           notes: ''
         });
+        setWaitingListStudentSearchTerm('');
         fetchWaitingList();
       } else {
         toast.error(result.error || 'Failed to add student to waiting list');
@@ -421,11 +455,19 @@ export function RoomManagementPage() {
 
   const getRoomTypeIcon = (type: string) => {
     switch (type) {
-      case 'single': return <Bed className="h-4 w-4" />;
-      case 'double': return <Users className="h-4 w-4" />;
-      case 'triple': return <Home className="h-4 w-4" />;
-      case 'dormitory': return <Building className="h-4 w-4" />;
+      case '2_sharing': return <Users className="h-4 w-4" />;
+      case '4_sharing': return <Users className="h-4 w-4" />;
+      case '5_sharing': return <Building className="h-4 w-4" />;
       default: return <Bed className="h-4 w-4" />;
+    }
+  };
+
+  const formatRoomType = (type: string) => {
+    switch (type) {
+      case '2_sharing': return '2 Sharing';
+      case '4_sharing': return '4 Sharing';
+      case '5_sharing': return '5 Sharing';
+      default: return type;
     }
   };
 
@@ -631,10 +673,9 @@ export function RoomManagementPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="single">Single</SelectItem>
-                          <SelectItem value="double">Double</SelectItem>
-                          <SelectItem value="triple">Triple</SelectItem>
-                          <SelectItem value="dormitory">Dormitory</SelectItem>
+                          <SelectItem value="2_sharing">2 Sharing</SelectItem>
+                          <SelectItem value="4_sharing">4 Sharing</SelectItem>
+                          <SelectItem value="5_sharing">5 Sharing</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -687,7 +728,7 @@ export function RoomManagementPage() {
                             <TableCell>
                               <div className="flex items-center space-x-2">
                                 {getRoomTypeIcon(room.room_type)}
-                                <span className="capitalize">{room.room_type}</span>
+                                <span>{formatRoomType(room.room_type)}</span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -988,16 +1029,22 @@ export function RoomManagementPage() {
                 <Label htmlFor="room_type">Room Type</Label>
                 <Select 
                   value={newRoom.room_type} 
-                  onValueChange={(value: 'single' | 'double' | 'triple' | 'dormitory') => setNewRoom({ ...newRoom, room_type: value })}
+                  onValueChange={(value: '2_sharing' | '4_sharing' | '5_sharing') => {
+                    let capacity = 2; // default
+                    if (value === '2_sharing') capacity = 2;
+                    else if (value === '4_sharing') capacity = 4;
+                    else if (value === '5_sharing') capacity = 5;
+                    
+                    setNewRoom({ ...newRoom, room_type: value, capacity });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="single">Single</SelectItem>
-                    <SelectItem value="double">Double</SelectItem>
-                    <SelectItem value="triple">Triple</SelectItem>
-                    <SelectItem value="dormitory">Dormitory</SelectItem>
+                    <SelectItem value="2_sharing">2 Sharing</SelectItem>
+                    <SelectItem value="4_sharing">4 Sharing</SelectItem>
+                    <SelectItem value="5_sharing">5 Sharing</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1043,21 +1090,40 @@ export function RoomManagementPage() {
             <form onSubmit={handleAllotRoom} className="space-y-4">
               <div>
                 <Label htmlFor="student_id">Student</Label>
-                <Select 
-                  value={allotmentForm.student_id} 
-                  onValueChange={(value) => setAllotmentForm({ ...allotmentForm, student_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.filter(s => s.hostel_status === 'day_scholar').map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.full_name} ({student.register_number})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or registration number..."
+                      value={studentSearchTerm}
+                      onChange={(e) => setStudentSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select 
+                    value={allotmentForm.student_id} 
+                    onValueChange={(value) => setAllotmentForm({ ...allotmentForm, student_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select student" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {fuzzySearchStudents(studentSearchTerm, students).map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{student.full_name}</span>
+                            <span className="text-sm text-gray-500">{student.register_number}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      {fuzzySearchStudents(studentSearchTerm, students).length === 0 && (
+                        <div className="p-2 text-sm text-gray-500 text-center">
+                          No students found
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div>
                 <Label htmlFor="room_id">Available Room</Label>
@@ -1155,21 +1221,40 @@ export function RoomManagementPage() {
             <form onSubmit={handleAddToWaitingList} className="space-y-4">
               <div>
                 <Label htmlFor="waiting_student_id">Student</Label>
-                <Select 
-                  value={waitingListForm.student_id} 
-                  onValueChange={(value) => setWaitingListForm({ ...waitingListForm, student_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {students.filter(s => s.hostel_status === 'day_scholar').map((student) => (
-                      <SelectItem key={student.id} value={student.id}>
-                        {student.full_name} ({student.register_number})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or registration number..."
+                      value={waitingListStudentSearchTerm}
+                      onChange={(e) => setWaitingListStudentSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select 
+                    value={waitingListForm.student_id} 
+                    onValueChange={(value) => setWaitingListForm({ ...waitingListForm, student_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select student" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {fuzzySearchStudents(waitingListStudentSearchTerm, students).map((student) => (
+                        <SelectItem key={student.id} value={student.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{student.full_name}</span>
+                            <span className="text-sm text-gray-500">{student.register_number}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      {fuzzySearchStudents(waitingListStudentSearchTerm, students).length === 0 && (
+                        <div className="p-2 text-sm text-gray-500 text-center">
+                          No students found
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1202,10 +1287,9 @@ export function RoomManagementPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="any">Any Type</SelectItem>
-                      <SelectItem value="single">Single</SelectItem>
-                      <SelectItem value="double">Double</SelectItem>
-                      <SelectItem value="triple">Triple</SelectItem>
-                      <SelectItem value="dormitory">Dormitory</SelectItem>
+                      <SelectItem value="2_sharing">2 Sharing</SelectItem>
+                      <SelectItem value="4_sharing">4 Sharing</SelectItem>
+                      <SelectItem value="5_sharing">5 Sharing</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

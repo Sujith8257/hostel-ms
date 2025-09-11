@@ -14,7 +14,7 @@ const createRoomSchema = Joi.object({
   room_number: Joi.string().required().max(20),
   building_id: Joi.string().uuid().required(),
   floor_number: Joi.number().integer().min(1).required(),
-  room_type: Joi.string().valid('single', 'double', 'triple', 'dormitory').required(),
+  room_type: Joi.string().valid('2_sharing', '4_sharing', '5_sharing').required(),
   capacity: Joi.number().integer().min(1).max(10).required(),
   rent_amount: Joi.number().min(0).optional(),
   amenities: Joi.array().items(Joi.string()).optional(),
@@ -24,7 +24,7 @@ const createRoomSchema = Joi.object({
 const updateRoomSchema = Joi.object({
   room_number: Joi.string().max(20).optional(),
   floor_number: Joi.number().integer().min(1).optional(),
-  room_type: Joi.string().valid('single', 'double', 'triple', 'dormitory').optional(),
+  room_type: Joi.string().valid('2_sharing', '4_sharing', '5_sharing').optional(),
   capacity: Joi.number().integer().min(1).max(10).optional(),
   rent_amount: Joi.number().min(0).optional(),
   amenities: Joi.array().items(Joi.string()).optional(),
@@ -46,7 +46,7 @@ const transferRoomSchema = Joi.object({
 const addToWaitingListSchema = Joi.object({
   student_id: Joi.string().uuid().required(),
   preferred_building_id: Joi.string().uuid().optional(),
-  preferred_room_type: Joi.string().valid('single', 'double', 'triple', 'dormitory').optional(),
+  preferred_room_type: Joi.string().valid('2_sharing', '4_sharing', '5_sharing').optional(),
   preferred_floor: Joi.number().integer().min(1).optional(),
   priority_score: Joi.number().integer().min(0).max(100).default(0),
   notes: Joi.string().max(500).optional()
@@ -55,7 +55,7 @@ const addToWaitingListSchema = Joi.object({
 const roomQuerySchema = Joi.object({
   building_id: Joi.string().uuid().optional(),
   floor_number: Joi.number().integer().min(1).optional(),
-  room_type: Joi.string().valid('single', 'double', 'triple', 'dormitory').optional(),
+  room_type: Joi.string().valid('2_sharing', '4_sharing', '5_sharing').optional(),
   status: Joi.string().valid('available', 'occupied', 'maintenance', 'reserved').optional(),
   search: Joi.string().max(50).optional(),
   page: Joi.number().integer().min(1).default(1),
