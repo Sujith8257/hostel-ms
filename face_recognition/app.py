@@ -50,6 +50,15 @@ def decode_base64_embedding(data: str) -> Optional[bytes]:
         # Remove any existing padding
         clean_data = clean_data.rstrip('=')
         
+        # Check if length is fundamentally wrong (not recoverable)
+        if len(clean_data) % 4 == 1:
+            # Length ending in 1 mod 4 is impossible for valid base64
+            # Try to remove last character to see if it's recoverable
+            clean_data = clean_data[:-1]
+            if len(clean_data) % 4 == 1:
+                # Still impossible, data is corrupted beyond repair
+                return None
+        
         # Add correct padding
         missing_padding = len(clean_data) % 4
         if missing_padding:
