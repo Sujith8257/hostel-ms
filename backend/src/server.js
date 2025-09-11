@@ -30,17 +30,21 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 
 // CORS configuration
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:5174'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:5174','http://localhost:5175'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// Ensure CORS headers are sent for all OPTIONS preflight requests
+app.options('*', cors());
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100 // limit each IP to 100 requests per windowMs
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100000 // limit each IP to 100 requests per windowMs
 });
 app.use(limiter);
 
@@ -62,6 +66,14 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/api/cors-test', (req, res) => {
+  console.log('[CORS TEST] Origin:', req.headers.origin);
+  res.json({
+    message: 'CORS test successful',
+    origin: req.headers.origin,
+    allowedOrigins: process.env.ALLOWED_ORIGINS,
+  });
+});
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
