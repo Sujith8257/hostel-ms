@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,8 +26,19 @@ import {
   Users,
   Timer,
   BarChart3,
+  Shield,
+  Settings,
+  Database,
+  UserCheck,
+  LogOut as LogOutIcon,
+  BarChart3 as BarChart3Icon,
+  HelpCircle,
+  Building2,
+  UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface EntryLog {
   id: string;
@@ -55,6 +65,9 @@ interface EntryLogStats {
 const FACE_RECOGNITION_API_BASE = 'http://localhost:8005';
 
 export function EntryExitLogsPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const [logs, setLogs] = useState<EntryLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<EntryLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -282,6 +295,34 @@ export function EntryExitLogsPage() {
     const locations = new Set(logs.map(log => log.location));
     return Array.from(locations);
   };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
+  // Navigation items (same as AdminDashboard)
+  const navigationItems = [
+    { name: 'Dashboard', icon: Activity, href: '/admin', current: false },
+    { name: 'Students', icon: Users, href: '/students', current: false },
+    { name: 'Entry/Exit Logs', icon: Clock, href: '/entries', current: true },
+    { name: 'Security Alerts', icon: AlertTriangle, href: '/alerts', badge: 2, current: false },
+    { name: 'Room Management', icon: Building2, href: '/rooms', current: false },
+    { name: 'Security Monitor', icon: Eye, href: '/security', current: false },
+    { name: 'Visitor Management', icon: UserPlus, href: '/visitors', current: false },
+    { name: 'Reports', icon: BarChart3Icon, href: '/reports', current: false },
+  ];
+
+  const adminItems = [
+    { name: 'Staff Management', icon: Users, href: '/admin/staff' },
+    { name: 'System Settings', icon: Settings, href: '/admin/settings' },
+    { name: 'Access Control', icon: Shield, href: '/admin/access-control' },
+    { name: 'Notifications', icon: AlertTriangle, href: '/admin/notifications' },
+  ];
+
+  const helpItems = [
+    { name: 'Help & Support', icon: HelpCircle, href: '/help' },
+  ];
 
   if (isLoading) {
     return (
