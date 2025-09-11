@@ -14,20 +14,28 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login, isLoading, user } = useAuth();
+  const { login, isLoading, user, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   type FromState = { from?: { pathname?: string } } | null;
   const locState = (location.state ?? null) as FromState;
-  const fromPath = locState?.from?.pathname || '/dashboard';
+  const rawFromPath = locState?.from?.pathname || '/dashboard';
+  const fromPath = rawFromPath && rawFromPath.startsWith('/login') ? '/dashboard' : rawFromPath;
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
-      console.info('[LoginPage] Detected user after mount/update, navigating to', { to: fromPath, locationState: location.state });
-      navigate(fromPath, { replace: true });
+    if (user || session) {
+      const dest = fromPath || '/dashboard';
+      if (location.pathname !== dest) {
+        console.info('[LoginPage] Detected auth (user or session), navigating', { to: dest, hasUser: !!user, hasSession: !!session });
+        try {
+          navigate(dest, { replace: true });
+        } catch {
+          window.location.replace(dest);
+        }
+      }
     }
-  }, [user, navigate, fromPath, location.state]);
+  }, [user, session, navigate, fromPath, location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +44,13 @@ export function LoginPage() {
     const result = await login(email, password);
     console.info('[LoginPage] Login attempt finished', { success: result.success, error: result.error });
     if (result.success) {
-      // Navigation will happen automatically via useEffect
-      console.info('[LoginPage] Waiting for auth state to update and redirect');
+      console.info('[LoginPage] Login success, forcing redirect', { to: fromPath });
+      // Force redirect immediately to avoid races with auth state propagation
+      try {
+        navigate(fromPath, { replace: true });
+      } catch {
+        window.location.replace(fromPath);
+      }
     } else {
       setError(result.error || 'Invalid email or password');
     }

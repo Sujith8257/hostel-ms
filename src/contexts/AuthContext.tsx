@@ -161,6 +161,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: sessionError.message };
       }
 
+      // Immediately reflect session in context to avoid navigation races
+      try {
+        const { data: { session: newSession } } = await supabase.auth.getSession();
+        setSession(newSession);
+        console.info('[Auth] Session set in context after login', { hasSession: !!newSession, hasUser: !!newSession?.user });
+      } catch (getSessionErr) {
+        console.warn('[Auth] Could not retrieve session after login (continuing)', getSessionErr);
+      }
+
       // Set user/profile from backend response
       if (result.data?.profile) {
         setProfile(result.data.profile as DbProfile);
@@ -177,6 +186,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchUserProfile(result.data.user.id);
       }
       setLoading(false, 'login:success');
+      // Force navigation to dashboard immediately after successful login
+      try {
+        console.info('[Auth] Login success, forcing redirect to /dashboard');
+        window.location.replace('/dashboard');
+      } catch (e) {
+        console.warn('[Auth] Redirect to /dashboard failed, falling back', e);
+        window.location.href = '/dashboard';
+      }
       return { success: true };
     } catch (err) {
       console.error('[Auth] Login error:', err);
