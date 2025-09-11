@@ -11,6 +11,7 @@ import { AboutUsPage } from '@/pages/AboutUsPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AlertsPage } from '@/pages/AlertsPage';
 import { RoomManagementPage } from '@/pages/RoomManagementPage';
+import { StudentsPage } from '@/pages/StudentsPage';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { Toaster } from "@/components/ui/sonner"
 import './App.css';
@@ -37,14 +38,7 @@ function AppContent() {
         
         <Route path="/students" element={
           <ProtectedRoute>
-            <PlaceholderPage 
-              title="Student Management"
-              description="Manage student registrations, room assignments, and access permissions"
-              breadcrumbs={[
-                { title: 'Dashboard', href: '/dashboard' },
-                { title: 'Students' }
-              ]}
-            />
+            <StudentsPage />
           </ProtectedRoute>
         } />
         
