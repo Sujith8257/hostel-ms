@@ -429,12 +429,34 @@ export function EntryExitLogsPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading entry/exit logs...</p>
-          </div>
-        </div>
+            {/* Header */}
+            <div className="bg-card border-b border-border px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">Entry/Exit Logs</h1>
+                  <p className="text-muted-foreground">Real-time face recognition entry and exit logs from the hostel management system</p>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1 bg-muted rounded-full">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <Badge variant="secondary">Administrator</Badge>
+                    <span className="text-sm text-muted-foreground">AU4</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Loading Content */}
+            <div className="p-6">
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading entry/exit logs...</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -548,21 +570,43 @@ export function EntryExitLogsPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-600 mb-2">Error loading entry logs</p>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button onClick={loadLogs} className="mr-2">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Try Again
-            </Button>
-            <Button variant="outline" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
-              <Eye className="h-4 w-4 mr-2" />
-              Open Face Recognition Dashboard
-            </Button>
-          </div>
-        </div>
+            {/* Header */}
+            <div className="bg-card border-b border-border px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold">Entry/Exit Logs</h1>
+                  <p className="text-muted-foreground">Real-time face recognition entry and exit logs from the hostel management system</p>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1 bg-muted rounded-full">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <Badge variant="secondary">Administrator</Badge>
+                    <span className="text-sm text-muted-foreground">AU4</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Error Content */}
+            <div className="p-6">
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                  <p className="text-red-600 mb-2">Error loading entry logs</p>
+                  <p className="text-sm text-muted-foreground mb-4">{error}</p>
+                  <Button onClick={loadLogs} className="mr-2">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Try Again
+                  </Button>
+                  <Button variant="outline" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Open Face Recognition Dashboard
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
