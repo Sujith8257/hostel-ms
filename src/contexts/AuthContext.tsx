@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '@/types';
 import type { DbProfile } from '@/types/database-models';
@@ -16,17 +17,7 @@ interface AuthContextType {
 }
 
 // Narrow type for login response to avoid any
-interface BackendLoginResponse {
-  success: boolean;
-  error?: string;
-  data?: {
-    user?: { id: string; email?: string };
-    profile?: Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
-    session?: { access_token: string; refresh_token: string };
-  };
-}
-
-type MinimalProfile = Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
+// Note: Keep types minimal and only what we use to avoid unused declarations errors
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

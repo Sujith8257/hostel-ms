@@ -16,6 +16,8 @@ import { EntryExitLogsPage } from '@/pages/EntryExitLogsPage';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { Toaster } from "@/components/ui/sonner"
 import './App.css';
+import RouterLogger from '@/components/RouterLogger';
+import { PublicOnlyRoute } from '@/components/PublicOnlyRoute';
 
 function AppContent() {
   // Initialize token refresh
@@ -23,11 +25,20 @@ function AppContent() {
 
   return (
     <Router>
+      <RouterLogger />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/login" element={
+          <PublicOnlyRoute>
+            <LoginPage />
+          </PublicOnlyRoute>
+        } />
+        <Route path="/signup" element={
+          <PublicOnlyRoute>
+            <SignupPage />
+          </PublicOnlyRoute>
+        } />
         <Route path="/about" element={<AboutUsPage />} />
         
         {/* Protected Routes */}

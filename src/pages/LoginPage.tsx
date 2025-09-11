@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, Loader2, ArrowLeft } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function LoginPage() {
@@ -16,22 +16,28 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const { login, isLoading, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  type FromState = { from?: { pathname?: string } } | null;
+  const locState = (location.state ?? null) as FromState;
+  const fromPath = locState?.from?.pathname || '/dashboard';
 
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      console.info('[LoginPage] Detected user after mount/update, navigating to', { to: fromPath, locationState: location.state });
+      navigate(fromPath, { replace: true });
     }
-  }, [user, navigate]);
+  }, [user, navigate, fromPath, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
     const result = await login(email, password);
-    
+    console.info('[LoginPage] Login attempt finished', { success: result.success, error: result.error });
     if (result.success) {
       // Navigation will happen automatically via useEffect
+      console.info('[LoginPage] Waiting for auth state to update and redirect');
     } else {
       setError(result.error || 'Invalid email or password');
     }
