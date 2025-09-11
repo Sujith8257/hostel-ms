@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User } from '@/types';
+import type { User, UserRole } from '@/types';
 import type { DbProfile } from '@/types/database-models';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
@@ -9,12 +9,15 @@ interface AuthContextType {
   profile: DbProfile | null;
   session: Session | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string, fullName: string, role?: 'admin' | 'warden' | 'student') => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string, fullName: string, role?: UserRole, phone?: string, organization?: string, justification?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
+  refreshToken: () => Promise<{ success: boolean; error?: string }>;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const API_BASE_URL = 'http://localhost:3001';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -24,10 +27,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       if (session?.user) {
-        fetchUserProfile(session.user.id);
+        await fetchUserProfile(session.user.id);
       } else {
         setIsLoading(false);
       }
@@ -36,10 +39,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] State change:', event, { hasSession: !!session, hasUser: !!session?.user });
+      
       setSession(session);
       if (session?.user) {
-        fetchUserProfile(session.user.id);
+        await fetchUserProfile(session.user.id);
       } else {
         setUser(null);
         setProfile(null);
@@ -69,10 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Convert profile to User format for backward compatibility
         const userData: User = {
           id: profileData.id,
-          user_id: profileData.user_id,
           name: profileData.full_name,
           email: profileData.email,
-          role: profileData.role as 'admin' | 'warden' | 'student',
+          role: profileData.role,
           createdAt: new Date(profileData.created_at),
         };
         setUser(userData);
@@ -87,25 +91,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      
+      // Use backend API for login
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
       });
 
-      if (error) {
-        return { success: false, error: error.message };
+      const result = await response.json();
+
+      if (!result.success) {
+        setIsLoading(false);
+        return { success: false, error: result.error || 'Login failed' };
       }
 
-      if (data.user) {
-        await fetchUserProfile(data.user.id);
+      // Verify we have session data
+      if (!result.data?.session?.access_token) {
+        setIsLoading(false);
+        return { success: false, error: 'Invalid session data received' };
       }
 
+      // Set session with Supabase client
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.data.session.access_token,
+        refresh_token: result.data.session.refresh_token,
+      });
+
+      if (sessionError) {
+        console.error('Session set error:', sessionError);
+        setIsLoading(false);
+        return { success: false, error: sessionError.message };
+      }
+
+      // Fetch user profile directly to ensure state is properly set
+      await fetchUserProfile(result.data.user.id);
+      
       return { success: true };
     } catch (err) {
       console.error('Login error:', err);
-      return { success: false, error: 'An unexpected error occurred' };
-    } finally {
       setIsLoading(false);
+      return { success: false, error: 'Network error. Please check your connection.' };
     }
   };
 
@@ -113,23 +141,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string, 
     password: string, 
     fullName: string, 
-    role: 'admin' | 'warden' | 'student' = 'warden'
+    role: UserRole = 'warden',
+    phone?: string,
+    organization?: string,
+    justification?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: role,
-          },
+      
+      // Use backend API for signup
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          fullName, 
+          role, 
+          phone, 
+          organization, 
+          justification 
+        }),
       });
 
-      if (error) {
-        return { success: false, error: error.message };
+      const result = await response.json();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
       }
 
       return { success: true };
@@ -141,15 +181,104 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshToken = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession?.refresh_token) {
+        return { success: false, error: 'No refresh token available' };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      // Set new session
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: result.data.session.access_token,
+        refresh_token: result.data.session.refresh_token,
+      });
+
+      if (sessionError) {
+        return { success: false, error: sessionError.message };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Token refresh error:', err);
+      return { success: false, error: 'Failed to refresh token' };
+    }
+  };
+
   const logout = async (): Promise<void> => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
+    try {
+      setIsLoading(true);
+      
+      // Call backend logout first if we have a session
+      const token = session?.access_token;
+      if (token) {
+        try {
+          await fetch(`${API_BASE_URL}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          // Don't check response status - logout should always succeed on frontend
+        } catch (backendError) {
+          console.error('Backend logout error (continuing anyway):', backendError);
+        }
+      }
+      
+      // Clear Supabase session
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('Supabase logout error (continuing anyway):', error);
+        }
+      } catch (supabaseError) {
+        console.error('Supabase logout error (continuing anyway):', supabaseError);
+      }
+      
+      // Always clear local state regardless of API errors
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      
+      // Clear any localStorage items
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('mock_user');
+      
+      // Force navigation to home page
+      window.location.href = '/';
+      
+    } catch (err) {
+      console.error('Logout error (continuing anyway):', err);
+      // Force clear session even on error
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      localStorage.removeItem('supabase.auth.token');
+      localStorage.removeItem('mock_user');
+      window.location.href = '/';
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, refreshToken, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

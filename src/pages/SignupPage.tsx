@@ -60,7 +60,15 @@ export function SignupPage() {
     }
 
     try {
-      const result = await signup(formData.email, formData.password, formData.name, formData.role);
+      const result = await signup(
+        formData.email, 
+        formData.password, 
+        formData.name, 
+        formData.role,
+        formData.phone,
+        formData.organization,
+        formData.justification
+      );
       
       if (result.success) {
         setSuccess(true);

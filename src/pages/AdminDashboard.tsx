@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { 
   Users, 
   Shield, 
@@ -13,45 +14,70 @@ import {
   AlertTriangle,
   CheckCircle,
   TrendingUp,
-  Server,
   Camera,
   UserCheck,
   Clock
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardData, useRecentActivity } from '@/hooks/useDashboardData';
 
 export function AdminDashboard() {
   const { user } = useAuth();
+  const { stats, isLoading, error } = useDashboardData();
+  const { activities } = useRecentActivity(4);
+
+  if (isLoading) {
+    return (
+      <Layout title="System Administration" breadcrumbs={[{ title: 'Admin Dashboard' }]}>
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner />
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout title="System Administration" breadcrumbs={[{ title: 'Admin Dashboard' }]}>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600">Error loading dashboard data: {error}</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const systemStats = [
     {
-      title: 'Total Users',
-      value: 127,
-      change: '+12 this month',
+      title: 'Total Students',
+      value: stats.totalStudents,
+      change: `${stats.activeStudents} active`,
       icon: Users,
       color: 'text-blue-600',
       bg: 'bg-blue-50'
     },
     {
-      title: 'Active Cases',
-      value: 89,
-      change: '+8 this week',
+      title: 'Today\'s Entries',
+      value: stats.todayEntries,
+      change: `${stats.todayExits} exits`,
+      icon: Activity,
+      color: 'text-green-600',
+      bg: 'bg-green-50'
+    },
+    {
+      title: 'Pending Alerts',
+      value: stats.pendingAlerts,
+      change: `${stats.resolvedAlerts} resolved`,
       icon: AlertTriangle,
       color: 'text-orange-600',
       bg: 'bg-orange-50'
     },
     {
-      title: 'System Uptime',
-      value: '99.9%',
-      change: '30 days',
-      icon: Server,
-      color: 'text-green-600',
-      bg: 'bg-green-50'
-    },
-    {
       title: 'Detection Accuracy',
-      value: '94.2%',
-      change: '+2.1% improvement',
+      value: `${stats.detectionAccuracy}%`,
+      change: 'AI Performance',
       icon: TrendingUp,
       color: 'text-purple-600',
       bg: 'bg-purple-50'
@@ -285,38 +311,42 @@ export function AdminDashboard() {
             <CardHeader>
               <CardTitle>Recent System Activity</CardTitle>
               <CardDescription>
-                Latest administrative actions and system events
+                Latest entry/exit logs and system events
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[
-                  { action: 'User approved', user: 'Detective Smith', time: '2 minutes ago', type: 'approval' },
-                  { action: 'Camera offline', location: 'Station 12', time: '15 minutes ago', type: 'warning' },
-                  { action: 'Model updated', model: 'Face Recognition v2.1', time: '1 hour ago', type: 'update' },
-                  { action: 'New user request', user: 'Officer Johnson', time: '2 hours ago', type: 'request' },
-                ].map((activity, index) => (
-                  <div key={index} className="flex items-center space-x-3 p-2 rounded-lg border">
-                    <div className={`p-1 rounded-full ${
-                      activity.type === 'approval' ? 'bg-green-100' :
-                      activity.type === 'warning' ? 'bg-yellow-100' :
-                      activity.type === 'update' ? 'bg-blue-100' : 'bg-gray-100'
-                    }`}>
-                      {activity.type === 'approval' && <UserCheck className="h-4 w-4 text-green-600" />}
-                      {activity.type === 'warning' && <AlertTriangle className="h-4 w-4 text-yellow-600" />}
-                      {activity.type === 'update' && <Activity className="h-4 w-4 text-blue-600" />}
-                      {activity.type === 'request' && <Users className="h-4 w-4 text-gray-600" />}
+                {activities.length > 0 ? (
+                  activities.map((activity) => (
+                    <div key={activity.id} className="flex items-center space-x-3 p-2 rounded-lg border">
+                      <div className={`p-1 rounded-full ${
+                        activity.entry_type === 'entry' ? 'bg-green-100' : 'bg-blue-100'
+                      }`}>
+                        {activity.entry_type === 'entry' ? 
+                          <UserCheck className="h-4 w-4 text-green-600" /> :
+                          <Activity className="h-4 w-4 text-blue-600" />
+                        }
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          {activity.entry_type === 'entry' ? 'Student Entry' : 'Student Exit'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {activity.student_name} ({activity.register_number}) at {activity.location}
+                        </p>
+                      </div>
+                      <div className="flex items-center text-xs text-gray-500">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {new Date(activity.timestamp).toLocaleTimeString()}
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.user || activity.location || activity.model}</p>
-                    </div>
-                    <div className="flex items-center text-xs text-gray-500">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {activity.time}
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Activity className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                    <p>No recent activity</p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,3 +1,5 @@
+import type { UserRole } from './index';
+
 // Database-specific types that match the Supabase schema exactly
 export interface DbStudent {
   id: string;
@@ -45,7 +47,7 @@ export interface DbProfile {
   user_id: string;
   full_name: string;
   email: string;
-  role: 'admin' | 'warden' | 'student';
+  role: UserRole;
   created_at: string;
   updated_at: string;
 }
