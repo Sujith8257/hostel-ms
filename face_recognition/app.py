@@ -40,6 +40,26 @@ mp_face_detection = mp.solutions.face_detection
 # ------------------------------
 # Helper Functions for Supabase
 # ------------------------------
+
+def decode_base64_embedding(data: str) -> Optional[bytes]:
+    """Robust base64 decoding with error handling and cleanup"""
+    try:
+        # Clean the string - remove any whitespace and non-base64 characters
+        clean_data = ''.join(c for c in data if c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+        
+        # Remove any existing padding
+        clean_data = clean_data.rstrip('=')
+        
+        # Add correct padding
+        missing_padding = len(clean_data) % 4
+        if missing_padding:
+            clean_data += '=' * (4 - missing_padding)
+        
+        return base64.b64decode(clean_data)
+    except Exception as e:
+        print(f"Failed to decode base64: {e}")
+        return None
+
 def get_all_students(limit: int = 2000) -> List[Dict]:
     """Fetch all students from Supabase"""
     try:
@@ -112,16 +132,16 @@ def get_embedding_from_supabase(register_number: str) -> Optional[np.ndarray]:
                 # Direct bytes from bytea column
                 embedding = np.frombuffer(embedding_data, dtype=np.float32)
             elif isinstance(embedding_data, str):
-                # Base64 string (fallback for compatibility)
-                missing_padding = len(embedding_data) % 4
-                if missing_padding:
-                    embedding_data += '=' * (4 - missing_padding)
+                # Base64 string - use robust decoding
+                embedding_bytes = decode_base64_embedding(embedding_data)
+                if embedding_bytes is None:
+                    print(f"Failed to decode base64 embedding for student {register_number}")
+                    return None
                 
                 try:
-                    embedding_bytes = base64.b64decode(embedding_data)
                     embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
-                except (binascii.Error, ValueError) as e:
-                    print(f"Invalid base64 encoding for student {register_number}: {e}")
+                except ValueError as e:
+                    print(f"Failed to convert bytes to numpy array for student {register_number}: {e}")
                     return None
             else:
                 print(f"Invalid face embedding data type for student {register_number}: {type(embedding_data)}")
@@ -1355,24 +1375,27 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 try:
                     # Check if it's a valid base64 string
                     if isinstance(face_embedding_data, str):
-                        # Ensure proper padding for base64
-                        missing_padding = len(face_embedding_data) % 4
-                        if missing_padding:
-                            face_embedding_data += '=' * (4 - missing_padding)
-                        
-                        stored_embedding_bytes = base64.b64decode(face_embedding_data)
+                        # Use robust base64 decoding
+                        stored_embedding_bytes = decode_base64_embedding(face_embedding_data)
+                        if stored_embedding_bytes is None:
+                            print(f"Failed to decode base64 embedding for student {student.get('register_number', 'unknown')}")
+                            continue
                     else:
                         # If it's already bytes, use directly
                         stored_embedding_bytes = face_embedding_data
                     
-                    stored_embedding = np.frombuffer(stored_embedding_bytes, dtype=np.float32)
-                    
-                    # Validate embedding size (should be 512 for MobileFaceNet)
-                    if len(stored_embedding) != 512:
-                        print(f"Invalid embedding size for student {student.get('register_number', 'unknown')}: {len(stored_embedding)}")
+                    try:
+                        stored_embedding = np.frombuffer(stored_embedding_bytes, dtype=np.float32)
+                        
+                        # Validate embedding size (should be 512 for MobileFaceNet)
+                        if len(stored_embedding) != 512:
+                            print(f"Invalid embedding size for student {student.get('register_number', 'unknown')}: {len(stored_embedding)}")
+                            continue
+                    except ValueError as e:
+                        print(f"Failed to convert bytes to numpy array for student {student.get('register_number', 'unknown')}: {e}")
                         continue
                         
-                except (binascii.Error, ValueError) as decode_error:
+                except Exception as decode_error:
                     print(f"Invalid base64 encoding for student {student.get('register_number', 'unknown')}: {decode_error}")
                     continue
                 
@@ -1457,46 +1480,46 @@ async def cleanup_invalid_embeddings():
                 try:
                     # Validate base64 encoding
                     if isinstance(face_embedding_data, str):
-                        # Check and fix padding
-                        missing_padding = len(face_embedding_data) % 4
-                        if missing_padding:
-                            # Fix padding and update database
-                            fixed_data = face_embedding_data + '=' * (4 - missing_padding)
+                        # Use robust decoding to test and potentially fix
+                        test_bytes = decode_base64_embedding(face_embedding_data)
+                        if test_bytes is None:
+                            print(f"Corrupted embedding for student {register_number} - cannot decode")
+                            corrupted_count += 1
+                            continue
                             
-                            # Test decode
-                            test_bytes = base64.b64decode(fixed_data)
+                        try:
                             test_embedding = np.frombuffer(test_bytes, dtype=np.float32)
                             
                             if len(test_embedding) == 512:
-                                # Update in database
+                                # Re-encode properly and update database
+                                clean_b64 = base64.b64encode(test_bytes).decode('utf-8')
+                                
+                                # Update in database with clean base64
                                 supabase.table('students').update({
-                                    'face_embedding': fixed_data
+                                    'face_embedding': clean_b64
                                 }).eq('register_number', register_number).execute()
                                 fixed_count += 1
-                                print(f"Fixed padding for student {register_number}")
+                                print(f"Fixed encoding for student {register_number}")
                             else:
                                 invalid_count += 1
                                 print(f"Invalid embedding size for student {register_number}: {len(test_embedding)}")
-                        else:
-                            # Test decode existing data
-                            test_bytes = base64.b64decode(face_embedding_data)
-                            test_embedding = np.frombuffer(test_bytes, dtype=np.float32)
-                            
+                        except ValueError as e:
+                            invalid_count += 1
+                            print(f"Failed to decode embedding for student {register_number}: {e}")
+                    else:
+                        # Data is already bytes, validate size
+                        try:
+                            test_embedding = np.frombuffer(face_embedding_data, dtype=np.float32)
                             if len(test_embedding) != 512:
                                 invalid_count += 1
                                 print(f"Invalid embedding size for student {register_number}: {len(test_embedding)}")
-                    else:
-                        invalid_count += 1
-                        print(f"Invalid data type for student {register_number}")
+                        except ValueError as e:
+                            invalid_count += 1
+                            print(f"Invalid bytes data for student {register_number}: {e}")
                         
-                except (binascii.Error, ValueError) as e:
+                except Exception as e:
                     invalid_count += 1
-                    print(f"Invalid base64 for student {register_number}: {e}")
-                    
-                    # Optionally clear invalid embedding
-                    # supabase.table('students').update({
-                    #     'face_embedding': None
-                    # }).eq('register_number', register_number).execute()
+                    print(f"Error processing student {register_number}: {e}")
         
         return {
             "success": True,
