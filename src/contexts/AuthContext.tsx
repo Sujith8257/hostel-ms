@@ -201,17 +201,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(result.data.profile as DbProfile);
         const profileData = result.data.profile;
         userRole = profileData.role;
-        // Normalize role to 'admin' if it's 'administrator'
-        const normalizedRole = userRole === 'administrator' ? 'admin' : userRole;
         const userData: User = {
           id: profileData.id,
           name: profileData.full_name,
           email: profileData.email,
-          role: normalizedRole as 'admin' | 'warden' | 'student',
+          role: profileData.role as 'admin' | 'warden' | 'student',
           createdAt: new Date(profileData.created_at),
         };
         setUser(userData);
-        console.info('[Auth] User set from profile data', { user: userData, role: userRole, normalizedRole });
+        console.info('[Auth] User set from profile data', { user: userData, role: userRole });
       } else if (result.data?.user?.id) {
         console.info('[Auth] Fetching user profile from user ID');
         await fetchUserProfile(result.data.user.id);

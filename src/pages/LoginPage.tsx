@@ -25,10 +25,10 @@ export function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user || session) {
-      const isAdmin = user?.role === 'admin' || user?.role === 'administrator';
-      const dest = isAdmin ? '/admin' : (fromPath || '/AdminDashboard');
+      const isAdmin = user?.role === 'admin';
+      const dest = isAdmin ? '/admin' : (fromPath || '/dashboard');
       if (location.pathname !== dest) {
-        console.info('[LoginPage] Detected auth (user or session), navigating', { to: dest, role: user?.role, isAdmin, hasUser: !!user, hasSession: !!session });
+        console.info('[LoginPage] Detected auth (user or session), navigating', { to: dest, role: user?.role, hasUser: !!user, hasSession: !!session });
         try {
           navigate(dest, { replace: true });
         } catch {
@@ -45,10 +45,10 @@ export function LoginPage() {
     const result = await login(email, password);
     console.info('[LoginPage] Login attempt finished', { success: result.success, error: result.error, role: result.role });
     if (result.success) {
-      // Check if user role is admin from database
-      const isAdmin = result.role === 'admin' || result.role === 'administrator';
-      const destination = isAdmin ? '/admin' : (fromPath || '/dashboard');
-      console.info('[LoginPage] Login success, redirecting', { to: destination, role: result.role, isAdmin });
+      // Use role directly from login response
+      const isAdmin = result.role === 'admin';
+      const destination = isAdmin ? '/admin' : fromPath;
+      console.info('[LoginPage] Login success, redirecting', { to: destination, role: result.role });
       try {
         navigate(destination, { replace: true });
       } catch {
