@@ -22,7 +22,7 @@ export function Navbar() {
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
-    
+    console.info('[Navbar] Logout clicked');
     setIsLoggingOut(true);
     try {
       await logout();

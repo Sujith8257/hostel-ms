@@ -29,6 +29,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Small helper to keep track of loading toggles
+  const setLoading = (value: boolean, reason: string) => {
+    console.info('[Auth] setLoading', { value, reason });
+    setIsLoading(value);
+  };
+
+  // Force navigation to home page with fallbacks to avoid any SPA/router interference
+  const HOME_PATH = import.meta.env.BASE_URL || '/';
+  const hardRedirectHome = () => {
+    try {
+      window.location.replace(HOME_PATH);
+    } catch {
+      window.location.href = HOME_PATH;
+    }
+    // If navigation didn’t happen immediately, try again shortly
+    setTimeout(() => {
+      if (window.location.pathname !== HOME_PATH) {
+        try {
+          window.location.assign(HOME_PATH);
+        } catch {
+          window.location.href = HOME_PATH;
+        }
+      }
+    }, 50);
+    // Last resort: add a cache-busting query to ensure reload
+    setTimeout(() => {
+      if (window.location.pathname !== HOME_PATH) {
+        const sep = HOME_PATH.includes('?') ? '&' : '?';
+        window.location.href = `${HOME_PATH}${sep}t=${Date.now()}`;
+      }
+    }, 200);
+  };
+
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -36,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session?.user) {
         await fetchUserProfile(session.user.id);
       } else {
-        setIsLoading(false);
+        setLoading(false, 'initial: no session');
       }
     });
 
@@ -52,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null);
         setProfile(null);
-        setIsLoading(false);
+        setLoading(false, 'auth-change: no session');
       }
     });
 
@@ -98,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      setIsLoading(true);
+      setLoading(true, 'login:start');
       console.log('[Auth] Attempting login for', email);
 
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -108,12 +141,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const result = await response.json();
       if (!result.success) {
-        setIsLoading(false);
+        setLoading(false, 'login:backend result.success=false');
         return { success: false, error: result.error || 'Login failed' };
       }
       const sessionPayload = result.data?.session;
       if (!sessionPayload?.access_token) {
-        setIsLoading(false);
+        setLoading(false, 'login:invalid session payload');
         return { success: false, error: 'Invalid session data received' };
       }
       // Set Supabase session
@@ -124,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (sessionError) {
         console.error('[Auth] Session set error', sessionError);
-        setIsLoading(false);
+        setLoading(false, 'login:setSession error');
         return { success: false, error: sessionError.message };
       }
 
@@ -143,11 +176,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else if (result.data?.user?.id) {
         await fetchUserProfile(result.data.user.id);
       }
-      setIsLoading(false);
+      setLoading(false, 'login:success');
       return { success: true };
     } catch (err) {
       console.error('[Auth] Login error:', err);
-      setIsLoading(false);
+      setLoading(false, 'login:exception');
       return { success: false, error: 'Network error. Please check your connection.' };
     }
   };
@@ -162,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     justification?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      setIsLoading(true);
+      setLoading(true, 'signup:start');
       
       // Use backend API for signup
       const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
@@ -192,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Signup error:', err);
       return { success: false, error: 'An unexpected error occurred' };
     } finally {
-      setIsLoading(false);
+      setLoading(false, 'signup:finally');
     }
   };
 
@@ -236,59 +269,116 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
+    console.info('[Auth] Logout: start');
     try {
-      setIsLoading(true);
-      
+      // Do not set global isLoading to avoid ProtectedRoute spinner loops; rely on local UI state
       // Call backend logout first if we have a session
       const token = session?.access_token;
       if (token) {
         try {
-          await fetch(`${API_BASE_URL}/api/auth/logout`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          // Don't check response status - logout should always succeed on frontend
+          console.info('[Auth] Logout: calling backend /logout');
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 2000);
+          try {
+            await fetch(`${API_BASE_URL}/api/auth/logout`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
         } catch (backendError) {
-          console.error('Backend logout error (continuing anyway):', backendError);
+          console.warn('[Auth] Logout: backend logout error (continuing)', backendError);
         }
+      } else {
+        console.info('[Auth] Logout: no access token present, skipping backend call');
       }
-      
+
       // Clear Supabase session
       try {
+        console.info('[Auth] Logout: supabase.auth.signOut()');
         const { error } = await supabase.auth.signOut();
         if (error) {
-          console.error('Supabase logout error (continuing anyway):', error);
+          console.warn('[Auth] Logout: Supabase signOut error (continuing)', error);
         }
       } catch (supabaseError) {
-        console.error('Supabase logout error (continuing anyway):', supabaseError);
+        console.warn('[Auth] Logout: Supabase signOut threw (continuing)', supabaseError);
       }
-      
+
       // Always clear local state regardless of API errors
       setUser(null);
       setProfile(null);
       setSession(null);
-      
-      // Clear any localStorage items
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('mock_user');
-      
-      // Force navigation to home page
-      window.location.href = '/';
-      
+      console.info('[Auth] Logout: cleared context state');
+
+      // Best-effort: clear all accessible cookies for this site (cannot clear HttpOnly cookies)
+      try {
+        const cookies = document.cookie ? document.cookie.split('; ') : [];
+        const host = window.location.hostname;
+        const parts = host.split('.');
+        const domainVariants = new Set<string>();
+        for (let i = 0; i < parts.length; i++) {
+          const d = parts.slice(i).join('.');
+          if (d) {
+            domainVariants.add(d);
+            domainVariants.add('.' + d);
+          }
+        }
+        const segments = window.location.pathname.split('/').filter(Boolean);
+        const pathVariants = new Set<string>(['/']);
+        for (let i = 0; i < segments.length; i++) {
+          pathVariants.add('/' + segments.slice(0, i + 1).join('/'));
+        }
+        cookies.forEach((cookie) => {
+          const eqPos = cookie.indexOf('=');
+          const name = eqPos > -1 ? cookie.slice(0, eqPos) : cookie;
+          // Basic delete
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+          // Try domain/path combinations
+          domainVariants.forEach((domain) => {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${domain}; path=/`;
+            pathVariants.forEach((path) => {
+              document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${domain}; path=${path}`;
+            });
+          });
+          // Try path-only variants without domain
+          pathVariants.forEach((path) => {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}`;
+          });
+        });
+        console.info(`[Auth] Logout: attempted to clear ${cookies.length} cookie name(s)`);
+      } catch (cookieErr) {
+        console.warn('[Auth] Logout: cookie clearing failed (continuing)', cookieErr);
+      }
+
+      // Best-effort: clear localStorage auth keys (may vary by Supabase config)
+      try { localStorage.removeItem('mock_user'); } catch { /* ignore */ }
+      try { localStorage.removeItem('supabase.auth.token'); } catch { /* ignore */ }
+      try {
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          if ((k.startsWith('sb-') && k.includes('auth-token')) || k.startsWith('supabase.')) {
+            toRemove.push(k);
+          }
+        }
+        toRemove.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
+      } catch { /* ignore */ }
+
+      // Force hard navigation to landing page to avoid router race conditions
+      console.info('[Auth] Logout: redirecting to home');
+      hardRedirectHome();
     } catch (err) {
-      console.error('Logout error (continuing anyway):', err);
-      // Force clear session even on error
+      console.error('[Auth] Logout: unexpected error (continuing to redirect)', err);
       setUser(null);
       setProfile(null);
       setSession(null);
-      localStorage.removeItem('supabase.auth.token');
-      localStorage.removeItem('mock_user');
-      window.location.href = '/';
-    } finally {
-      setIsLoading(false);
+      hardRedirectHome();
     }
   };
 
