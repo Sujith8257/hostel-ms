@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, session, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -15,7 +15,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <LoadingSpinner />;
   }
 
-  if (!user) {
+  // Consider a valid session as authenticated, even if profile/user is still loading
+  if (!user && !session) {
     // Redirect to login with the current location as state
     console.warn('[ProtectedRoute] No user, redirecting to /login', { from: location.pathname });
     return <Navigate to="/login" state={{ from: location }} replace />;
