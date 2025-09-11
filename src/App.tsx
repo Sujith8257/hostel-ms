@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { PlaceholderPage } from '@/components/PlaceholderPage';
+import { ReportsPage } from '@/pages/ReportsPage';
+import { HelpPage } from '@/pages/HelpPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -71,16 +73,7 @@ function AppContent() {
           />
         } />
         
-        <Route path="/reports" element={
-          <PlaceholderPage 
-            title="Reports & Analytics"
-            description="Generate detailed reports on hostel operations and security metrics"
-            breadcrumbs={[
-              { title: 'Dashboard', href: '/dashboard' },
-              { title: 'Reports' }
-            ]}
-          />
-        } />
+        <Route path="/reports" element={<ReportsPage />} />
         
         <Route path="/admin/staff" element={
           <PlaceholderPage 
@@ -130,16 +123,7 @@ function AppContent() {
           />
         } />
         
-        <Route path="/help" element={
-          <PlaceholderPage 
-            title="Help & Support"
-            description="Documentation, user guides, and support resources"
-            breadcrumbs={[
-              { title: 'Dashboard', href: '/dashboard' },
-              { title: 'Help' }
-            ]}
-          />
-        } />
+        <Route path="/help" element={<HelpPage />} />
       </Routes>
     </Router>
   );

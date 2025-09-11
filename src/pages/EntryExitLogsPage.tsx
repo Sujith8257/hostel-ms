@@ -28,8 +28,6 @@ import {
   BarChart3,
   Shield,
   Settings,
-  Database,
-  UserCheck,
   LogOut as LogOutIcon,
   BarChart3 as BarChart3Icon,
   HelpCircle,
@@ -65,7 +63,7 @@ interface EntryLogStats {
 const FACE_RECOGNITION_API_BASE = 'http://localhost:8005';
 
 export function EntryExitLogsPage() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const [logs, setLogs] = useState<EntryLog[]>([]);
@@ -433,7 +431,7 @@ export function EntryExitLogsPage() {
           <div className="flex-1">
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner />
-            </div>
+        </div>
           </div>
         </div>
       </div>
@@ -1014,7 +1012,8 @@ export function EntryExitLogsPage() {
               </div>
             </CardContent>
           </Card>
-            </motion.div>
+        </motion.div>
+      </div>
           </div>
         </div>
       </div>

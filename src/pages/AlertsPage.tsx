@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,8 +20,6 @@ import {
   AlertCircle,
   Activity,
   Settings,
-  Database,
-  UserCheck,
   User,
   LogOut,
   BarChart3,
@@ -120,7 +117,7 @@ const mockAlerts: Alert[] = [
 ];
 
 export function AlertsPage() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
@@ -400,10 +397,11 @@ export function AlertsPage() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Search</label>
+                <label htmlFor="search-input" className="text-sm font-medium">Search</label>
                 <div className="relative">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="search-input"
                     placeholder="Search alerts..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -413,9 +411,9 @@ export function AlertsPage() {
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium">Severity</label>
+                <label htmlFor="severity-select" className="text-sm font-medium">Severity</label>
                 <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-                  <SelectTrigger>
+                  <SelectTrigger id="severity-select">
                     <SelectValue placeholder="All severities" />
                   </SelectTrigger>
                   <SelectContent>
@@ -429,9 +427,9 @@ export function AlertsPage() {
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
+                <label htmlFor="status-select" className="text-sm font-medium">Status</label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger>
+                  <SelectTrigger id="status-select">
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
@@ -445,9 +443,9 @@ export function AlertsPage() {
               </div>
               
               <div className="space-y-2">
-                <label className="text-sm font-medium">Type</label>
+                <label htmlFor="type-select" className="text-sm font-medium">Type</label>
                 <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger>
+                  <SelectTrigger id="type-select">
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -470,12 +468,7 @@ export function AlertsPage() {
                   const TypeIcon = getTypeIcon(alert.type);
                   
                   return (
-                    <motion.div
-                      key={alert.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
+                    <div key={alert.id}>
                       <Card className={`${alert.severity === 'critical' ? 'border-red-500' : ''}`}>
                         <CardHeader>
                           <div className="flex items-start justify-between">
@@ -574,7 +567,7 @@ export function AlertsPage() {
                           </div>
                         </CardHeader>
                       </Card>
-                    </motion.div>
+                    </div>
                   );
                 })}
               </div>

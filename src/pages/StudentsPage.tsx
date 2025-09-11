@@ -8,7 +8,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { FaceEmbeddingVisualization } from '@/components/FaceEmbeddingVisualization';
 import { 
   Users, 
@@ -34,8 +33,6 @@ import {
   Scan,
   Shield,
   Settings,
-  Database,
-  UserCheck,
   User,
   LogOut,
   BarChart3,
@@ -93,7 +90,7 @@ interface StudentStats {
 }
 
 export function StudentsPage() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const [students, setStudents] = useState<DbStudent[]>([]);
@@ -645,8 +642,11 @@ export function StudentsPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-            <div className="flex items-center justify-center h-64">
-              <LoadingSpinner />
+        <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Loading students...</p>
+        </div>
             </div>
           </div>
         </div>
@@ -761,15 +761,15 @@ export function StudentsPage() {
 
           {/* Main Content */}
           <div className="flex-1">
-            <div className="flex items-center justify-center h-64">
-              <div className="text-center">
-                <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <p className="text-red-600">Error loading students data: {error}</p>
-                <Button onClick={loadData} className="mt-4">
-                  Try Again
-                </Button>
-              </div>
-            </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600">Error loading students data: {error}</p>
+            <Button onClick={loadData} className="mt-4">
+              Try Again
+            </Button>
+          </div>
+        </div>
           </div>
         </div>
       </div>
@@ -903,442 +903,442 @@ export function StudentsPage() {
 
           {/* Dashboard Content */}
           <div className="p-6">
-            <div className="space-y-6">
-              {/* Header */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-              >
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Student Management</h1>
-                  <p className="text-muted-foreground">
-                    Manage student registrations, room assignments, and access permissions
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import
-                  </Button>
-                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Add Student
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>Add New Student</DialogTitle>
-                        <DialogDescription>
-                          Enter the student's information to register them in the hostel management system.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium">Register Number *</label>
-                            <Input
-                              placeholder="REG001"
-                              value={formData.register_number}
-                              onChange={(e) => setFormData(prev => ({ ...prev, register_number: e.target.value }))}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Full Name *</label>
-                            <Input
-                              placeholder="John Doe"
-                              value={formData.full_name}
-                              onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium">Email</label>
-                            <Input
-                              type="email"
-                              placeholder="john@example.com"
-                              value={formData.email}
-                              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Phone</label>
-                            <Input
-                              placeholder="+1234567890"
-                              value={formData.phone}
-                              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium">Hostel Status</label>
-                            <Select value={formData.hostel_status} onValueChange={(value: 'resident' | 'day_scholar' | 'former_resident') => 
-                              setFormData(prev => ({ ...prev, hostel_status: value }))}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="resident">Resident</SelectItem>
-                                <SelectItem value="day_scholar">Day Scholar</SelectItem>
-                                <SelectItem value="former_resident">Former Resident</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="text-sm font-medium">Room Number</label>
-                            <Input
-                              placeholder="A-101"
-                              value={formData.room_number}
-                              onChange={(e) => setFormData(prev => ({ ...prev, room_number: e.target.value }))}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => {
-                          setIsAddDialogOpen(false);
-                          resetAddForm();
-                        }}>
-                          Cancel
-                        </Button>
-                        <Button onClick={onAddStudent}>
-                          Add Student
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </motion.div>
-
-              {/* Statistics Cards */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="grid gap-4 md:grid-cols-2 lg:grid-cols-8"
-              >
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stats.total}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Active</CardTitle>
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Residents</CardTitle>
-                    <Building className="h-4 w-4 text-blue-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-blue-600">{stats.residents}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Day Scholars</CardTitle>
-                    <Activity className="h-4 w-4 text-purple-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-purple-600">{stats.dayScholars}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">With Rooms</CardTitle>
-                    <Bed className="h-4 w-4 text-orange-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-orange-600">{stats.withRooms}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Without Rooms</CardTitle>
-                    <Clock className="h-4 w-4 text-red-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-red-600">{stats.withoutRooms}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Face Enrolled</CardTitle>
-                    <Scan className="h-4 w-4 text-emerald-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-emerald-600">{stats.faceEnrolled}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Face Not Set Up</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-amber-600">{stats.faceNotEnrolled}</div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Filters and Search */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Filters</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col md:flex-row gap-4">
-                      <div className="flex-1">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Search by name, register number, email, phone, or room..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9"
-                          />
-                        </div>
-                      </div>
-                      <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full md:w-[200px]">
-                          <Filter className="h-4 w-4 mr-2" />
-                          <SelectValue placeholder="Filter by status" />
+      <div className="space-y-6">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+        >
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Student Management</h1>
+            <p className="text-muted-foreground">
+              Manage student registrations, room assignments, and access permissions
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Student
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add New Student</DialogTitle>
+                  <DialogDescription>
+                    Enter the student's information to register them in the hostel management system.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Register Number *</label>
+                      <Input
+                        placeholder="REG001"
+                        value={formData.register_number}
+                        onChange={(e) => setFormData(prev => ({ ...prev, register_number: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Full Name *</label>
+                      <Input
+                        placeholder="John Doe"
+                        value={formData.full_name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Email</label>
+                      <Input
+                        type="email"
+                        placeholder="john@example.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Phone</label>
+                      <Input
+                        placeholder="+1234567890"
+                        value={formData.phone}
+                        onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Hostel Status</label>
+                      <Select value={formData.hostel_status} onValueChange={(value: 'resident' | 'day_scholar' | 'former_resident') => 
+                        setFormData(prev => ({ ...prev, hostel_status: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Students</SelectItem>
-                          <SelectItem value="active">Active Only</SelectItem>
-                          <SelectItem value="inactive">Inactive Only</SelectItem>
-                          <SelectItem value="residents">Residents</SelectItem>
-                          <SelectItem value="day_scholars">Day Scholars</SelectItem>
-                          <SelectItem value="with_rooms">With Rooms</SelectItem>
-                          <SelectItem value="without_rooms">Without Rooms</SelectItem>
-                          <SelectItem value="face_enrolled">Face Recognition Enrolled</SelectItem>
-                          <SelectItem value="face_not_enrolled">Face Recognition Not Set Up</SelectItem>
+                          <SelectItem value="resident">Resident</SelectItem>
+                          <SelectItem value="day_scholar">Day Scholar</SelectItem>
+                          <SelectItem value="former_resident">Former Resident</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Students Table */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Students ({filteredStudents.length})</CardTitle>
-                    <CardDescription>
-                      {filteredStudents.length === students.length 
-                        ? 'All students in the system'
-                        : `Filtered from ${students.length} total students`
-                      }
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Student Info</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Room</TableHead>
-                            <TableHead>Face Recognition</TableHead>
-                            <TableHead>Joined</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredStudents.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={7} className="text-center py-8">
-                                <div className="text-muted-foreground">
-                                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                                  <p>No students found</p>
-                                  {searchTerm || statusFilter !== 'all' ? (
-                                    <p className="text-sm">Try adjusting your search or filters</p>
-                                  ) : (
-                                    <p className="text-sm">Start by adding your first student</p>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredStudents.map((student) => (
-                              <TableRow key={student.id}>
-                                <TableCell>
-                                  <div>
-                                    <div className="font-medium">{student.full_name}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      ID: {student.register_number}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="text-sm">
-                                    {student.email && (
-                                      <div className="flex items-center gap-1">
-                                        <Mail className="h-3 w-3" />
-                                        {student.email}
-                                      </div>
-                                    )}
-                                    {student.phone && (
-                                      <div className="flex items-center gap-1">
-                                        <Phone className="h-3 w-3" />
-                                        {student.phone}
-                                      </div>
-                                    )}
-                                    {!student.email && !student.phone && (
-                                      <span className="text-muted-foreground">No contact info</span>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex flex-col gap-1">
-                                    {getStatusBadge(student)}
-                                    {!student.is_active && (
-                                      <Badge variant="destructive" className="text-xs">Inactive</Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {student.room_number ? (
-                                    <div className="flex items-center gap-1">
-                                      <Home className="h-4 w-4" />
-                                      {student.room_number}
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground">Not assigned</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    {student.face_embedding ? (
-                                      <Badge className="bg-green-100 text-green-800">
-                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                        Enrolled
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="secondary">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        Not Set Up
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1 text-sm">
-                                    <Calendar className="h-3 w-3" />
-                                    {new Date(student.created_at).toLocaleDateString()}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openViewDialog(student)}
-                                      title="View Details"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openEditDialog(student)}
-                                      title="Edit Student"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => openViewDialog(student)}
-                                      className={student.face_embedding ? "text-green-600 hover:text-green-700" : "text-blue-600 hover:text-blue-700"}
-                                      title={student.face_embedding ? "View Face Recognition" : "Set Up Face Recognition"}
-                                    >
-                                      <Scan className="h-4 w-4" />
-                                    </Button>
-                                    {!student.room_number ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => openRoomAllocation(student)}
-                                        className="text-blue-600 hover:text-blue-700"
-                                        title="Allocate Room"
-                                      >
-                                        <Home className="h-4 w-4" />
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => deallocateRoom(student)}
-                                        className="text-orange-600 hover:text-orange-700"
-                                        title="Deallocate Room"
-                                      >
-                                        <UserMinus className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => onDeleteStudent(student)}
-                                      className="text-red-600 hover:text-red-700"
-                                      title="Delete Student"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                    <div>
+                      <label className="text-sm font-medium">Room Number</label>
+                      <Input
+                        placeholder="A-101"
+                        value={formData.room_number}
+                        onChange={(e) => setFormData(prev => ({ ...prev, room_number: e.target.value }))}
+                      />
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => {
+                    setIsAddDialogOpen(false);
+                    resetAddForm();
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button onClick={onAddStudent}>
+                    Add Student
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </motion.div>
 
-              {/* View Student Dialog */}
-              <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                      <Eye className="h-5 w-5" />
-                      Student Details
-                    </DialogTitle>
-                    <DialogDescription>
-                      Complete information for {selectedStudent?.full_name}
-                    </DialogDescription>
-                  </DialogHeader>
+        {/* Statistics Cards */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid gap-4 md:grid-cols-2 lg:grid-cols-8"
+        >
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Residents</CardTitle>
+              <Building className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{stats.residents}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Day Scholars</CardTitle>
+              <Activity className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{stats.dayScholars}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">With Rooms</CardTitle>
+              <Bed className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{stats.withRooms}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Without Rooms</CardTitle>
+              <Clock className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{stats.withoutRooms}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Face Enrolled</CardTitle>
+              <Scan className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">{stats.faceEnrolled}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Face Not Set Up</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">{stats.faceNotEnrolled}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Filters and Search */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name, register number, email, phone, or room..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-[200px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Students</SelectItem>
+                    <SelectItem value="active">Active Only</SelectItem>
+                    <SelectItem value="inactive">Inactive Only</SelectItem>
+                    <SelectItem value="residents">Residents</SelectItem>
+                    <SelectItem value="day_scholars">Day Scholars</SelectItem>
+                    <SelectItem value="with_rooms">With Rooms</SelectItem>
+                    <SelectItem value="without_rooms">Without Rooms</SelectItem>
+                    <SelectItem value="face_enrolled">Face Recognition Enrolled</SelectItem>
+                    <SelectItem value="face_not_enrolled">Face Recognition Not Set Up</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Students Table */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle>Students ({filteredStudents.length})</CardTitle>
+              <CardDescription>
+                {filteredStudents.length === students.length 
+                  ? 'All students in the system'
+                  : `Filtered from ${students.length} total students`
+                }
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student Info</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Room</TableHead>
+                      <TableHead>Face Recognition</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStudents.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="text-muted-foreground">
+                            <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p>No students found</p>
+                            {searchTerm || statusFilter !== 'all' ? (
+                              <p className="text-sm">Try adjusting your search or filters</p>
+                            ) : (
+                              <p className="text-sm">Start by adding your first student</p>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredStudents.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{student.full_name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                ID: {student.register_number}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {student.email && (
+                                <div className="flex items-center gap-1">
+                                  <Mail className="h-3 w-3" />
+                                  {student.email}
+                                </div>
+                              )}
+                              {student.phone && (
+                                <div className="flex items-center gap-1">
+                                  <Phone className="h-3 w-3" />
+                                  {student.phone}
+                                </div>
+                              )}
+                              {!student.email && !student.phone && (
+                                <span className="text-muted-foreground">No contact info</span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              {getStatusBadge(student)}
+                              {!student.is_active && (
+                                <Badge variant="destructive" className="text-xs">Inactive</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {student.room_number ? (
+                              <div className="flex items-center gap-1">
+                                <Home className="h-4 w-4" />
+                                {student.room_number}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Not assigned</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {student.face_embedding ? (
+                                <Badge className="bg-green-100 text-green-800">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Enrolled
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Not Set Up
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3" />
+                              {new Date(student.created_at).toLocaleDateString()}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openViewDialog(student)}
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(student)}
+                                title="Edit Student"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openViewDialog(student)}
+                                className={student.face_embedding ? "text-green-600 hover:text-green-700" : "text-blue-600 hover:text-blue-700"}
+                                title={student.face_embedding ? "View Face Recognition" : "Set Up Face Recognition"}
+                              >
+                                <Scan className="h-4 w-4" />
+                              </Button>
+                              {!student.room_number ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openRoomAllocation(student)}
+                                  className="text-blue-600 hover:text-blue-700"
+                                  title="Allocate Room"
+                                >
+                                  <Home className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deallocateRoom(student)}
+                                  className="text-orange-600 hover:text-orange-700"
+                                  title="Deallocate Room"
+                                >
+                                  <UserMinus className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => onDeleteStudent(student)}
+                                className="text-red-600 hover:text-red-700"
+                                title="Delete Student"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* View Student Dialog */}
+        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Student Details
+              </DialogTitle>
+              <DialogDescription>
+                Complete information for {selectedStudent?.full_name}
+              </DialogDescription>
+            </DialogHeader>
             {selectedStudent && (
               <Tabs defaultValue="info" className="space-y-4">
                 <TabsList className="grid w-full grid-cols-2">
@@ -1587,8 +1587,8 @@ export function StudentsPage() {
             <div className="space-y-4">
               {isLoadingRooms ? (
                 <div className="text-center py-8">
-                  <LoadingSpinner />
-                  <p className="text-sm text-muted-foreground mt-2">Loading available rooms...</p>
+                  <Building className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Loading available rooms...</p>
                 </div>
               ) : (
                 <>
@@ -1724,10 +1724,10 @@ export function StudentsPage() {
               >
                 Allocate Room
               </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
           </div>
         </div>
       </div>
