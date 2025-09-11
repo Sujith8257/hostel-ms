@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { PlaceholderPage } from '@/components/PlaceholderPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { HelpPage } from '@/pages/HelpPage';
+import { SecurityMonitoringPage } from '@/pages/SecurityMonitoringPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -51,16 +52,7 @@ function AppContent() {
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/rooms" element={<RoomManagementPage />} />
         
-        <Route path="/security" element={
-          <PlaceholderPage 
-            title="Security Monitoring"
-            description="Real-time security monitoring and unauthorized access detection"
-            breadcrumbs={[
-              { title: 'Dashboard', href: '/dashboard' },
-              { title: 'Security' }
-            ]}
-          />
-        } />
+        <Route path="/security" element={<SecurityMonitoringPage />} />
         
         <Route path="/visitors" element={
           <PlaceholderPage 

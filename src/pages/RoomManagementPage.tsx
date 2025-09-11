@@ -321,12 +321,7 @@ export function RoomManagementPage() {
           animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col md:flex-row justify-between items-start md:items-center"
         >
-            <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Room Management</h1>
-                  <p className="text-muted-foreground">
-                    Manage hostel rooms, occupancy, and student assignments
-              </p>
-            </div>
+
                 <div className="flex items-center gap-2 mt-4 md:mt-0">
                   <Badge variant="outline" className="flex items-center gap-1">
                     <Activity className="h-3 w-3" />
