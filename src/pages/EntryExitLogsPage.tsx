@@ -326,17 +326,227 @@ export function EntryExitLogsPage() {
 
   if (isLoading) {
     return (
-      <Layout title="Entry/Exit Logs" breadcrumbs={[{ title: 'Dashboard', href: '/dashboard' }, { title: 'Entry/Exit Logs' }]}>
+      <div className="min-h-screen bg-background">
+        <div className="flex">
+          {/* Sidebar */}
+          <div className="w-64 bg-card border-r border-border">
+            <div className="p-6">
+              {/* Logo */}
+              <div className="flex items-center space-x-3 mb-8">
+                <div className="p-2 bg-primary rounded-lg">
+                  <Shield className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold">HostelMS</h1>
+                  <p className="text-sm text-muted-foreground">Hostel Management System</p>
+                </div>
+              </div>
+
+              {/* Main Navigation */}
+              <div className="mb-8">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                  Main Navigation
+                </h3>
+                <nav className="space-y-2">
+                  {navigationItems.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        item.current
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                      {item.badge && (
+                        <Badge variant="destructive" className="ml-auto">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Administration */}
+              <div className="mb-8">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                  Administration
+                </h3>
+                <nav className="space-y-2">
+                  {adminItems.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Help & Support */}
+              <div className="mb-8">
+                <nav className="space-y-2">
+                  {helpItems.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* User Info */}
+              <div className="mt-auto pt-6 border-t border-border">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="p-2 bg-muted rounded-lg">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Admin User 41542</p>
+                    <p className="text-xs text-muted-foreground">Administrator</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="w-full justify-start"
+                >
+                  <LogOutIcon className="h-4 w-4 mr-2" />
+                  Log out
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1">
         <div className="flex items-center justify-center h-64">
           <LoadingSpinner />
+            </div>
+          </div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Layout title="Entry/Exit Logs" breadcrumbs={[{ title: 'Dashboard', href: '/dashboard' }, { title: 'Entry/Exit Logs' }]}>
+      <div className="min-h-screen bg-background">
+        <div className="flex">
+          {/* Sidebar */}
+          <div className="w-64 bg-card border-r border-border">
+            <div className="p-6">
+              {/* Logo */}
+              <div className="flex items-center space-x-3 mb-8">
+                <div className="p-2 bg-primary rounded-lg">
+                  <Shield className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold">HostelMS</h1>
+                  <p className="text-sm text-muted-foreground">Hostel Management System</p>
+                </div>
+              </div>
+
+              {/* Main Navigation */}
+              <div className="mb-8">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                  Main Navigation
+                </h3>
+                <nav className="space-y-2">
+                  {navigationItems.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        item.current
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                      {item.badge && (
+                        <Badge variant="destructive" className="ml-auto">
+                          {item.badge}
+                        </Badge>
+                      )}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Administration */}
+              <div className="mb-8">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                  Administration
+                </h3>
+                <nav className="space-y-2">
+                  {adminItems.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* Help & Support */}
+              <div className="mb-8">
+                <nav className="space-y-2">
+                  {helpItems.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.name}</span>
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
+              {/* User Info */}
+              <div className="mt-auto pt-6 border-t border-border">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="p-2 bg-muted rounded-lg">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Admin User 41542</p>
+                    <p className="text-xs text-muted-foreground">Administrator</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="w-full justify-start"
+                >
+                  <LogOutIcon className="h-4 w-4 mr-2" />
+                  Log out
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -352,15 +562,139 @@ export function EntryExitLogsPage() {
             </Button>
           </div>
         </div>
-      </Layout>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Layout 
-      title="Entry/Exit Logs" 
-      breadcrumbs={[{ title: 'Dashboard', href: '/dashboard' }, { title: 'Entry/Exit Logs' }]}
-    >
+    <div className="min-h-screen bg-background">
+      <div className="flex">
+        {/* Sidebar */}
+        <div className="w-64 bg-card border-r border-border">
+          <div className="p-6">
+            {/* Logo */}
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="p-2 bg-primary rounded-lg">
+                <Shield className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">HostelMS</h1>
+                <p className="text-sm text-muted-foreground">Hostel Management System</p>
+              </div>
+            </div>
+
+            {/* Main Navigation */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Main Navigation
+              </h3>
+              <nav className="space-y-2">
+                {navigationItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      item.current
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                    {item.badge && (
+                      <Badge variant="destructive" className="ml-auto">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* Administration */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Administration
+              </h3>
+              <nav className="space-y-2">
+                {adminItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* Help & Support */}
+            <div className="mb-8">
+              <nav className="space-y-2">
+                {helpItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* User Info */}
+            <div className="mt-auto pt-6 border-t border-border">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-2 bg-muted rounded-lg">
+                  <User className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Admin User 41542</p>
+                  <p className="text-xs text-muted-foreground">Administrator</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="w-full justify-start"
+              >
+                <LogOutIcon className="h-4 w-4 mr-2" />
+                Log out
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1">
+          {/* Header */}
+          <div className="bg-card border-b border-border px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Entry/Exit Logs</h1>
+                <p className="text-muted-foreground">Real-time face recognition entry and exit logs from the hostel management system</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1 bg-muted rounded-full">
+                    <User className="h-4 w-4" />
+                  </div>
+                  <Badge variant="secondary">Administrator</Badge>
+                  <span className="text-sm text-muted-foreground">AU4</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dashboard Content */}
+          <div className="p-6">
       <div className="space-y-6">
         {/* Header */}
         <motion.div
@@ -680,8 +1014,10 @@ export function EntryExitLogsPage() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+            </motion.div>
+          </div>
+        </div>
       </div>
-    </Layout>
+    </div>
   );
 }
