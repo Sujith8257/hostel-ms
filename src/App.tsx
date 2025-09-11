@@ -6,6 +6,7 @@ import { ReportsPage } from '@/pages/ReportsPage';
 import { HelpPage } from '@/pages/HelpPage';
 import { SecurityMonitoringPage } from '@/pages/SecurityMonitoringPage';
 import { VisitorManagementPage } from '@/pages/VisitorManagementPage';
+import { StudentDashboard } from '@/pages/StudentDashboard';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -47,8 +48,9 @@ function AppContent() {
         
         {/* Public Routes - No Authentication Required */}
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard" element={<StudentDashboard />} />
         <Route path="/students" element={<StudentsPage />} />
+        <Route path="/student-dashboard" element={<StudentDashboard />} />
         <Route path="/entries" element={<EntryExitLogsPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/rooms" element={<RoomManagementPage />} />

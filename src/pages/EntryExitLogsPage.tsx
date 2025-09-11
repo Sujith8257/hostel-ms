@@ -450,11 +450,11 @@ export function EntryExitLogsPage() {
 
             {/* Loading Content */}
             <div className="p-6">
-              <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p className="text-muted-foreground">Loading entry/exit logs...</p>
-                </div>
+        </div>
               </div>
             </div>
           </div>
@@ -591,21 +591,21 @@ export function EntryExitLogsPage() {
 
             {/* Error Content */}
             <div className="p-6">
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <p className="text-red-600 mb-2">Error loading entry logs</p>
-                  <p className="text-sm text-muted-foreground mb-4">{error}</p>
-                  <Button onClick={loadLogs} className="mr-2">
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Try Again
-                  </Button>
-                  <Button variant="outline" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Open Face Recognition Dashboard
-                  </Button>
-                </div>
-              </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600 mb-2">Error loading entry logs</p>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            <Button onClick={loadLogs} className="mr-2">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+            <Button variant="outline" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
+              <Eye className="h-4 w-4 mr-2" />
+              Open Face Recognition Dashboard
+            </Button>
+          </div>
+        </div>
             </div>
           </div>
         </div>
@@ -702,7 +702,7 @@ export function EntryExitLogsPage() {
           <div>
                   <p className="text-sm font-medium">Admin User 41542</p>
                   <p className="text-xs text-muted-foreground">Administrator</p>
-                </div>
+          </div>
               </div>
               <Button
                 variant="outline"
@@ -742,19 +742,19 @@ export function EntryExitLogsPage() {
           <div className="p-6">
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2 mb-6">
-              <Button variant="outline" size="sm" onClick={loadLogs}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
-                <Eye className="h-4 w-4 mr-2" />
-                Face Recognition Dashboard
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={loadLogs}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.open(`${FACE_RECOGNITION_API_BASE}`, '_blank')}>
+              <Eye className="h-4 w-4 mr-2" />
+              Face Recognition Dashboard
+            </Button>
+          </div>
 
       <div className="space-y-6">
 

@@ -20,13 +20,21 @@ export function LoginPage() {
   type FromState = { from?: { pathname?: string } } | null;
   const locState = (location.state ?? null) as FromState;
   const rawFromPath = locState?.from?.pathname || '/dashboard';
-  const fromPath = rawFromPath && rawFromPath.startsWith('/login') ? '/dashboard' : rawFromPath;
+  const fromPath = rawFromPath?.startsWith('/login') ? '/dashboard' : rawFromPath;
 
   // Redirect if already logged in
   useEffect(() => {
     if (user || session) {
       const isAdmin = user?.role === 'admin';
-      const dest = isAdmin ? '/admin' : (fromPath || '/dashboard');
+      const isStudent = user?.role === 'student';
+      let dest = fromPath || '/dashboard';
+      
+      if (isAdmin) {
+        dest = '/admin';
+      } else if (isStudent) {
+        dest = '/dashboard';
+      }
+      
       if (location.pathname !== dest) {
         console.info('[LoginPage] Detected auth (user or session), navigating', { to: dest, role: user?.role, hasUser: !!user, hasSession: !!session });
         try {
@@ -47,7 +55,15 @@ export function LoginPage() {
     if (result.success) {
       // Use role directly from login response
       const isAdmin = result.role === 'admin';
-      const destination = isAdmin ? '/admin' : fromPath;
+      const isStudent = result.role === 'student';
+      let destination = fromPath;
+      
+      if (isAdmin) {
+        destination = '/admin';
+      } else if (isStudent) {
+        destination = '/student-dashboard';
+      }
+      
       console.info('[LoginPage] Login success, redirecting', { to: destination, role: result.role });
       try {
         navigate(destination, { replace: true });
@@ -235,9 +251,9 @@ export function LoginPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {testCredentials.map((cred, index) => (
+                      {testCredentials.map((cred) => (
                         <Button
-                          key={index}
+                          key={cred.email}
                           variant="outline"
                           size="sm"
                           onClick={() => quickLogin(cred)}

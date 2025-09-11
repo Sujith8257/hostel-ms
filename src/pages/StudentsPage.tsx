@@ -794,7 +794,7 @@ export function StudentsPage() {
 
             {/* Dashboard Content */}
             <div className="p-6">
-              <div className="flex items-center justify-center h-64">
+        <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p className="text-muted-foreground mt-4">Loading students...</p>
@@ -806,7 +806,7 @@ export function StudentsPage() {
                   >
                     {isLoading ? 'Loading...' : 'Refresh'}
                   </Button>
-                </div>
+        </div>
               </div>
             </div>
           </div>
@@ -943,15 +943,15 @@ export function StudentsPage() {
 
             {/* Dashboard Content */}
             <div className="p-6">
-              <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                  <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                  <p className="text-red-600">Error loading students data: {error}</p>
-                  <Button onClick={loadData} className="mt-4">
-                    Try Again
-                  </Button>
-                </div>
-              </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-red-600">Error loading students data: {error}</p>
+            <Button onClick={loadData} className="mt-4">
+              Try Again
+            </Button>
+          </div>
+        </div>
             </div>
           </div>
         </div>
@@ -1086,7 +1086,7 @@ export function StudentsPage() {
 
           {/* Dashboard Content */}
           <div className="p-6">
-            <div className="space-y-6">
+      <div className="space-y-6">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1905,7 +1905,7 @@ export function StudentsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-            </div>
+      </div>
           </div>
         </div>
       </div>
