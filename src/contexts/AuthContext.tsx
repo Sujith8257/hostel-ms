@@ -83,11 +83,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+<<<<<<< HEAD
       const profileData = Array.isArray(data) ? data[0] : data;
 
       if (!profileData) {
         console.warn('[Auth] No profile found for user', userId);
         return;
+=======
+      if (profileData) {
+        setProfile(profileData as DbProfile);
+        // Convert profile to User format for backward compatibility
+        const userData: User = {
+          id: profileData.id,
+          name: profileData.full_name,
+          email: profileData.email,
+          role: profileData.role as 'admin' | 'warden' | 'student',
+          createdAt: new Date(profileData.created_at),
+        };
+        setUser(userData);
+>>>>>>> db49fe8 (major fix 2)
       }
 
       setProfile(profileData as DbProfile);
@@ -110,13 +124,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true);
+<<<<<<< HEAD
       console.log('[Auth] Attempting login for', email);
 
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+=======
+      const response = await fetch('/api/auth/login', {
+>>>>>>> db49fe8 (major fix 2)
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
+<<<<<<< HEAD
 
   let result: BackendLoginResponse = { success: false };
       try {
@@ -141,10 +160,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Set Supabase session FIRST so subsequent queries are authenticated
+=======
+      const result = await response.json();
+      if (!result.success) {
+        setIsLoading(false);
+        return { success: false, error: result.error || 'Login failed' };
+      }
+      const sessionPayload = result.data?.session;
+      if (!sessionPayload?.access_token) {
+        setIsLoading(false);
+        return { success: false, error: 'Invalid session data received' };
+      }
+      // Set Supabase session
+>>>>>>> db49fe8 (major fix 2)
       const { error: sessionError } = await supabase.auth.setSession({
         access_token: sessionPayload.access_token,
         refresh_token: sessionPayload.refresh_token,
       });
+<<<<<<< HEAD
 
       if (sessionError) {
         console.error('[Auth] Session set error', sessionError);
@@ -181,6 +214,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[Auth] Login error:', err);
       setIsLoading(false);
       return { success: false, error: 'Network error. Please check your connection.' };
+=======
+      if (sessionError) {
+        setIsLoading(false);
+        return { success: false, error: sessionError.message };
+      }
+      // Set user/profile from backend response
+      if (result.data?.profile) {
+        setProfile(result.data.profile as DbProfile);
+        const profileData = result.data.profile;
+        const userData: User = {
+          id: profileData.id,
+          user_id: profileData.user_id,
+          name: profileData.full_name,
+          email: profileData.email,
+          role: profileData.role as 'admin' | 'warden' | 'student',
+          createdAt: new Date(profileData.created_at),
+        };
+        setUser(userData);
+      } else if (result.data?.user?.id) {
+        await fetchUserProfile(result.data.user.id);
+      }
+      setIsLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error('Login error:', err);
+      setIsLoading(false);
+      return { success: false, error: 'An unexpected error occurred' };
+>>>>>>> db49fe8 (major fix 2)
     }
   };
 
