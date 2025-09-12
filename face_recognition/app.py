@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Dict, Optional, List
 import os
+import json
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import io
@@ -70,12 +71,37 @@ def decode_base64_embedding(data: str) -> Optional[bytes]:
         return None
 
 def get_all_students(limit: int = 2000) -> List[Dict]:
-    """Fetch all students from Supabase"""
+    """Fetch all students from Supabase with non-null face embeddings"""
+    try:
+        print(f"🔍 Fetching students with face embeddings from Supabase (limit: {limit})...")
+        result = supabase.table('students').select('*').eq('is_active', True).not_.is_('face_embedding', 'null').limit(limit).execute()
+        print(f"   Raw result type: {type(result)}")
+        print(f"   Result data type: {type(result.data) if hasattr(result, 'data') else 'No data attr'}")
+        
+        if result.data:
+            print(f"   Found {len(result.data)} students with face embeddings")
+            # Check first student structure
+            if len(result.data) > 0:
+                first_student = result.data[0]
+                print(f"   First student keys: {list(first_student.keys())}")
+                print(f"   First student register_number: {first_student.get('register_number')}")
+                print(f"   First student face_embedding type: {type(first_student.get('face_embedding'))}")
+        else:
+            print(f"   No students with face embeddings found")
+            
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"❌ Error fetching students from Supabase: {e}")
+        print(f"   Exception type: {type(e)}")
+        return []
+
+def get_all_students_including_no_face(limit: int = 2000) -> List[Dict]:
+    """Fetch all students from Supabase (including those without face embeddings)"""
     try:
         result = supabase.table('students').select('*').eq('is_active', True).limit(limit).execute()
         return result.data if result.data else []
     except Exception as e:
-        print(f"Error fetching students from Supabase: {e}")
+        print(f"Error fetching all students from Supabase: {e}")
         return []
 
 def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full_name: str = None) -> bool:
@@ -83,6 +109,12 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
     try:
         # Convert embedding to list for JSONB storage
         embedding_list = embedding.astype(np.float32).tolist()
+        
+        print(f"💾 Saving embedding for student {register_number}:")
+        print(f"   Original embedding shape: {embedding.shape}")
+        print(f"   Converted to list length: {len(embedding_list)}")
+        print(f"   List type: {type(embedding_list)}")
+        print(f"   First 3 values: {embedding_list[:3]}")
         
         # Check if student already exists
         existing_student = supabase.table('students').select('*').eq('register_number', register_number).execute()
@@ -122,6 +154,10 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
                 location='Face Recognition System'
             )
         
+        print(f"✅ Successfully saved embedding for {register_number} to Supabase!")
+        print(f"   Storage format: JSONB list")
+        print(f"   Embedding length: {len(embedding_list)}")
+        
         return True
     except Exception as e:
         print(f"Error saving embedding to Supabase: {e}")
@@ -130,27 +166,41 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
 def get_embedding_from_supabase(register_number: str) -> Optional[np.ndarray]:
     """Retrieve face embedding from Supabase students table"""
     try:
+        print(f"📥 Retrieving embedding for student {register_number} from Supabase...")
         result = supabase.table('students').select('face_embedding').eq('register_number', register_number).eq('is_active', True).execute()
         
         if result.data and result.data[0]['face_embedding']:
             # For JSONB column, we get a list directly
             embedding_data = result.data[0]['face_embedding']
+            print(f"   Raw data type from Supabase: {type(embedding_data)}")
+            if isinstance(embedding_data, list):
+                print(f"   List length: {len(embedding_data)}")
+                print(f"   First 3 values: {embedding_data[:3]}")
             
             if isinstance(embedding_data, list):
                 # Convert list to numpy array (JSONB format)
                 embedding = np.array(embedding_data, dtype=np.float32)
             elif isinstance(embedding_data, str):
-                # Handle legacy base64 encoded strings (for backward compatibility)
-                embedding_bytes = decode_base64_embedding(embedding_data)
-                if embedding_bytes is None:
-                    print(f"Failed to decode legacy embedding for {register_number}")
-                    return None
-                
+                # Try to parse as JSON array first
                 try:
-                    embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
-                except ValueError as e:
-                    print(f"Failed to convert legacy bytes to array for {register_number}: {e}")
-                    return None
+                    parsed_data = json.loads(embedding_data)
+                    if isinstance(parsed_data, list):
+                        embedding = np.array(parsed_data, dtype=np.float32)
+                        print(f"   Parsed JSON string to array with {len(parsed_data)} elements")
+                    else:
+                        raise ValueError("Parsed data is not a list")
+                except (json.JSONDecodeError, ValueError):
+                    # Handle legacy base64 encoded strings (for backward compatibility)
+                    embedding_bytes = decode_base64_embedding(embedding_data)
+                    if embedding_bytes is None:
+                        print(f"Failed to decode legacy embedding for {register_number}")
+                        return None
+                    
+                    try:
+                        embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
+                    except ValueError as e:
+                        print(f"Failed to convert legacy bytes to array for {register_number}: {e}")
+                        return None
             elif isinstance(embedding_data, bytes):
                 # Handle legacy bytea format (for backward compatibility)
                 embedding = np.frombuffer(embedding_data, dtype=np.float32)
@@ -158,12 +208,22 @@ def get_embedding_from_supabase(register_number: str) -> Optional[np.ndarray]:
                 print(f"Unexpected embedding data type for {register_number}: {type(embedding_data)}")
                 return None
             
-            # Validate embedding size
-            if len(embedding) != 512:
-                print(f"Invalid embedding size for {register_number}: {len(embedding)} (expected 512)")
+            # Validate embedding size (flexible for different model versions)
+            expected_sizes = [120, 128, 256, 512]  # Support various embedding dimensions
+            if len(embedding) not in expected_sizes:
+                print(f"❌ Invalid embedding size for {register_number}: {len(embedding)} (expected one of {expected_sizes})")
                 return None
+            
+            print(f"✅ Successfully retrieved embedding for {register_number}:")
+            print(f"   Shape: {embedding.shape}")
+            print(f"   Data type: {embedding.dtype}")
+            print(f"   Min: {embedding.min():.6f}, Max: {embedding.max():.6f}")
+            print(f"   Mean: {embedding.mean():.6f}")
+            print(f"   L2 norm: {np.linalg.norm(embedding):.6f}")
                 
             return embedding
+        else:
+            print(f"❌ No face embedding found for student {register_number}")
         return None
     except Exception as e:
         print(f"Error retrieving embedding from Supabase: {e}")
@@ -283,6 +343,18 @@ def get_embedding(face_img):
     embedding = interpreter.get_tensor(output_details[0]['index']).flatten()
     # L2 normalize
     embedding = embedding / np.linalg.norm(embedding)
+    
+    # Console log the extracted embedding details
+    print(f"🔍 Extracted face embedding:")
+    print(f"   Shape: {embedding.shape}")
+    print(f"   Length: {len(embedding)}")
+    print(f"   Data type: {embedding.dtype}")
+    print(f"   Min value: {embedding.min():.6f}")
+    print(f"   Max value: {embedding.max():.6f}")
+    print(f"   Mean: {embedding.mean():.6f}")
+    print(f"   L2 norm: {np.linalg.norm(embedding):.6f}")
+    print(f"   First 5 values: {embedding[:5]}")
+    
     return embedding
 
 # ------------------------------
@@ -1068,9 +1140,20 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
             raise HTTPException(status_code=404, detail="No face data found for this student")
 
         # Calculate similarity
-        similarity = 1 - cosine(stored_embedding, embedding)
-        similarity = similarity + 0.125  # Adjustment as in original code
-        success = bool(similarity > 0.5)   # Threshold as in original code
+        cosine_dist = cosine(stored_embedding, embedding)
+        raw_similarity = 1 - cosine_dist
+        similarity = raw_similarity + 0.125  # Adjustment as in original code
+        threshold = 0.5
+        success = bool(similarity > threshold)
+        
+        print(f"🔐 Authentication comparison for {register_number}:")
+        print(f"   Query embedding shape: {embedding.shape}")
+        print(f"   Stored embedding shape: {stored_embedding.shape}")
+        print(f"   Cosine distance: {cosine_dist:.6f}")
+        print(f"   Raw similarity: {raw_similarity:.6f}")
+        print(f"   Adjusted similarity: {similarity:.6f}")
+        print(f"   Threshold: {threshold}")
+        print(f"   Authentication result: {'✅ SUCCESS' if success else '❌ FAILED'}")
 
         if success:
             # Log entry to entry_logs table
@@ -1367,20 +1450,81 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
 
         embedding = get_embedding(face)
         
-        # Get all students with face embeddings
+        # Get all students with face embeddings (filter at database level)
         students = get_all_students(limit=2000)
-        students_with_faces = [s for s in students if s.get('face_embedding')]
+        print(f"📊 Database query results:")
+        print(f"   Total students with face embeddings: {len(students)}")
+        
+        # Debug: Check the first few students
+        for i, student in enumerate(students[:3]):
+            print(f"   Student {i+1}: {student.get('register_number', 'N/A')} ({student.get('full_name', 'Unknown')}) - Face data: {type(student.get('face_embedding'))}")
+            if student.get('face_embedding'):
+                face_data = student['face_embedding']
+                if isinstance(face_data, list):
+                    print(f"     JSONB list length: {len(face_data)}")
+                    print(f"     First 3 values: {face_data[:3]}")
+                elif isinstance(face_data, str):
+                    print(f"     String length: {len(face_data)}")
+                    print(f"     First 50 chars: {face_data[:50]}...")
+                else:
+                    print(f"     Other type: {type(face_data)}")
+        
+        # All students returned should have face embeddings, but validate them
+        students_with_faces = []
+        students_with_face_data_count = 0
+        
+        for student in students:
+            face_data = student.get('face_embedding')
+            if face_data:  # Double-check since we filtered at DB level
+                # Additional check for valid data
+                if isinstance(face_data, list) and len(face_data) > 0:
+                    students_with_faces.append(student)
+                    students_with_face_data_count += 1
+                    print(f"   ✅ Student {student.get('register_number')} ({student.get('full_name', 'Unknown')}) has valid JSONB face data")
+                elif isinstance(face_data, str) and len(face_data) > 0:
+                    # Try to parse string as JSON array
+                    try:
+                        parsed_data = json.loads(face_data)
+                        if isinstance(parsed_data, list) and len(parsed_data) > 0:
+                            students_with_faces.append(student)
+                            students_with_face_data_count += 1
+                            print(f"   ✅ Student {student.get('register_number')} ({student.get('full_name', 'Unknown')}) has JSON string face data (length: {len(parsed_data)})")
+                        else:
+                            print(f"   ❌ Student {student.get('register_number')} has invalid JSON string data")
+                    except json.JSONDecodeError:
+                        # Legacy base64 string
+                        students_with_faces.append(student)
+                        students_with_face_data_count += 1
+                        print(f"   ✅ Student {student.get('register_number')} ({student.get('full_name', 'Unknown')}) has legacy base64 face data")
+                elif isinstance(face_data, bytes) and len(face_data) > 0:
+                    students_with_faces.append(student)
+                    students_with_face_data_count += 1
+                    print(f"   ✅ Student {student.get('register_number')} ({student.get('full_name', 'Unknown')}) has legacy bytes face data")
+                else:
+                    print(f"   ❌ Student {student.get('register_number')} has invalid face data: {type(face_data)}")
+        
+        print(f"📊 Face data summary: {students_with_face_data_count} students have valid face embeddings")
         
         best_match = None
         best_similarity = 0.0
         recognition_threshold = 0.5  # Threshold for face recognition
         
+        print(f"🔍 Starting face recognition comparison...")
+        print(f"   Query embedding shape: {embedding.shape}")
+        print(f"   Students with face data: {len(students_with_faces)}")
+        print(f"   Recognition threshold: {recognition_threshold}")
+        
         # Compare with all registered faces
+        comparison_count = 0
         for student in students_with_faces:
             try:
                 face_embedding_data = student.get('face_embedding')
                 if not face_embedding_data:
                     continue
+                
+                comparison_count += 1
+                student_reg = student.get('register_number', 'unknown')
+                print(f"\n🔄 Comparing with student {student_reg} ({comparison_count}/{len(students_with_faces)})...")
                 
                 # Handle JSONB list format (current) and legacy formats
                 try:
@@ -1388,12 +1532,21 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                         # JSONB list format (current)
                         stored_embedding = np.array(face_embedding_data, dtype=np.float32)
                     elif isinstance(face_embedding_data, str):
-                        # Legacy base64 encoded data
-                        stored_embedding_bytes = decode_base64_embedding(face_embedding_data)
-                        if stored_embedding_bytes is None:
-                            print(f"Failed to decode base64 embedding for student {student.get('register_number', 'unknown')}")
-                            continue
-                        stored_embedding = np.frombuffer(stored_embedding_bytes, dtype=np.float32)
+                        # Try to parse as JSON array first
+                        try:
+                            parsed_data = json.loads(face_embedding_data)
+                            if isinstance(parsed_data, list):
+                                stored_embedding = np.array(parsed_data, dtype=np.float32)
+                                print(f"     Parsed JSON string to array with {len(parsed_data)} elements")
+                            else:
+                                raise ValueError("Parsed data is not a list")
+                        except (json.JSONDecodeError, ValueError):
+                            # Legacy base64 encoded data
+                            stored_embedding_bytes = decode_base64_embedding(face_embedding_data)
+                            if stored_embedding_bytes is None:
+                                print(f"Failed to decode base64 embedding for student {student.get('register_number', 'unknown')}")
+                                continue
+                            stored_embedding = np.frombuffer(stored_embedding_bytes, dtype=np.float32)
                     elif isinstance(face_embedding_data, bytes):
                         # Legacy raw bytes data
                         stored_embedding = np.frombuffer(face_embedding_data, dtype=np.float32)
@@ -1401,9 +1554,9 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                         print(f"Unknown embedding data type for student {student.get('register_number', 'unknown')}: {type(face_embedding_data)}")
                         continue
                     
-                    # Validate embedding size (should be 512 for MobileFaceNet)
-                    if len(stored_embedding) != 512:
-                        print(f"Invalid embedding size for student {student.get('register_number', 'unknown')}: {len(stored_embedding)}")
+                    # Validate embedding size (should match query embedding size)
+                    if len(stored_embedding) != len(embedding):
+                        print(f"Embedding size mismatch for student {student.get('register_number', 'unknown')}: stored={len(stored_embedding)}, query={len(embedding)}")
                         continue
                         
                 except Exception as decode_error:
@@ -1411,18 +1564,40 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                     continue
                 
                 # Calculate similarity
-                similarity = 1 - cosine(stored_embedding, embedding)
-                similarity = similarity + 0.125  # Adjustment as in original code
+                cosine_dist = cosine(stored_embedding, embedding)
+                similarity = 1 - cosine_dist
+                adjusted_similarity = similarity + 0.125  # Adjustment as in original code
                 
-                if similarity > best_similarity:
-                    best_similarity = similarity
+                print(f"   Similarity calculation:")
+                print(f"     Cosine distance: {cosine_dist:.6f}")
+                print(f"     Raw similarity: {similarity:.6f}")
+                print(f"     Adjusted similarity: {adjusted_similarity:.6f}")
+                print(f"     Above threshold ({recognition_threshold}): {adjusted_similarity > recognition_threshold}")
+                
+                if adjusted_similarity > best_similarity:
+                    print(f"     🎯 New best match! Previous best: {best_similarity:.6f}")
+                    best_similarity = adjusted_similarity
                     best_match = student
+                else:
+                    print(f"     Current best remains: {best_similarity:.6f}")
                     
             except Exception as e:
                 print(f"Error comparing with student {student.get('register_number', 'unknown')}: {e}")
                 continue
         
+        print(f"\n🏁 Face recognition completed:")
+        print(f"   Total comparisons: {comparison_count}")
+        print(f"   Best similarity: {best_similarity:.6f}")
+        print(f"   Recognition threshold: {recognition_threshold}")
+        print(f"   Match found: {best_match is not None and best_similarity > recognition_threshold}")
+        
         if best_match and best_similarity > recognition_threshold:
+            print(f"✅ STUDENT RECOGNIZED:")
+            print(f"   Name: {best_match['full_name']}")
+            print(f"   Register Number: {best_match['register_number']}")
+            print(f"   Confidence: {round(best_similarity * 100, 1)}%")
+            print(f"   Location: {location}")
+            
             # Log entry for recognized student
             entry_logged = log_entry(
                 register_number=best_match['register_number'],
@@ -1609,7 +1784,7 @@ async def test_embedding():
 async def get_students_endpoint():
     """Get all students from Supabase"""
     try:
-        students = get_all_students(limit=2000)
+        students = get_all_students_including_no_face(limit=2000)
         return {
             "success": True,
             "students": students,
@@ -1668,6 +1843,58 @@ async def get_attendance_today():
         return {"success": True, "attendance": result.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get today's attendance: {str(e)}")
+
+@app.get("/debug/students")
+async def debug_students():
+    """Debug endpoint to check student data in database"""
+    try:
+        print("🔍 Debug: Checking student data...")
+        students = get_all_students_including_no_face(limit=10)
+        
+        debug_info = {
+            "total_students": len(students),
+            "students_with_face_data": 0,
+            "face_data_types": {},
+            "sample_students": []
+        }
+        
+        for i, student in enumerate(students):
+            face_data = student.get('face_embedding')
+            
+            # Count students with face data
+            if face_data:
+                debug_info["students_with_face_data"] += 1
+                
+                # Track data types
+                data_type = type(face_data).__name__
+                debug_info["face_data_types"][data_type] = debug_info["face_data_types"].get(data_type, 0) + 1
+            
+            # Include first 3 students as samples
+            if i < 3:
+                sample = {
+                    "register_number": student.get('register_number'),
+                    "full_name": student.get('full_name'),
+                    "has_face_data": bool(face_data),
+                    "face_data_type": type(face_data).__name__ if face_data else None,
+                    "face_data_length": len(face_data) if isinstance(face_data, (list, str, bytes)) else None
+                }
+                
+                if isinstance(face_data, list) and len(face_data) > 0:
+                    sample["first_3_values"] = face_data[:3]
+                
+                debug_info["sample_students"].append(sample)
+        
+        return {
+            "success": True,
+            "debug_info": debug_info
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
 
 @app.get("/health")
 async def health_check():
