@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { AdminDashboard } from '@/pages/AdminDashboard';
 import { HostelDirectorDashboard } from '@/pages/HostelDirectorDashboard';
 import { WardenDashboard } from '@/pages/WardenDashboard';

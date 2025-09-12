@@ -17,7 +17,7 @@ import {
   BookOpen,
   Calendar
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { associateWardenApi } from '@/api/client';
 
 export function AssociateWardenDashboard() {

@@ -18,7 +18,7 @@ import {
   Filter,
   Calendar
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 export function CaseManagerDashboard() {
   const { user } = useAuth();

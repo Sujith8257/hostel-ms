@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { PlaceholderPage } from '@/components/PlaceholderPage';
@@ -8,6 +8,9 @@ import { SecurityMonitoringPage } from '@/pages/SecurityMonitoringPage';
 import { VisitorManagementPage } from '@/pages/VisitorManagementPage';
 import { StudentDashboard } from '@/pages/StudentDashboard';
 import { StudentProfilePage } from '@/pages/StudentProfilePage';
+import { StudentRoomDetailsPage } from '@/pages/StudentRoomDetailsPage';
+import { StudentPaymentsPage } from '@/pages/StudentPaymentsPage';
+import { StudentAttendancePage } from '@/pages/StudentAttendancePage';
 import { WardenDashboard } from '@/pages/WardenDashboard';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -51,6 +54,9 @@ function AppContent() {
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/student" element={<StudentDashboard />} />
         <Route path="/student-profile" element={<StudentProfilePage />} />
+        <Route path="/student-room" element={<StudentRoomDetailsPage />} />
+        <Route path="/student-payments" element={<StudentPaymentsPage />} />
+        <Route path="/student-attendance" element={<StudentAttendancePage />} />
         <Route path="/warden" element={<WardenDashboard />} />
         
         
@@ -122,7 +128,6 @@ function AppContent() {
 
 function App() {
   return (
-    
     <ThemeProvider>
       <AuthProvider>
         <AppContent />

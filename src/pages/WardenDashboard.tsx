@@ -20,7 +20,7 @@ import {
   UserPlus,
   Activity
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useDashboardData, useUnresolvedAlerts, useRecentActivity } from '@/hooks/useDashboardData';
 import type { DbStudent } from '@/types/database-models';
 

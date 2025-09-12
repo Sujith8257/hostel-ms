@@ -17,7 +17,7 @@ import {
   Clock,
   BarChart3
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { directorApi } from '@/api/client';
 
 export function HostelDirectorDashboard() {

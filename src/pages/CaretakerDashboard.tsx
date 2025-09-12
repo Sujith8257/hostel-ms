@@ -17,7 +17,7 @@ import {
   Activity,
   FileText
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { caretakerApi } from '@/api/client';
 
 export function CaretakerDashboard() {

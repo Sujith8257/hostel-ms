@@ -40,7 +40,7 @@ import {
   Building2
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { studentService } from '@/lib/services';
 import { roomApi, adminApi } from '@/api/client';
 import type { DbStudent } from '@/types/database-models';

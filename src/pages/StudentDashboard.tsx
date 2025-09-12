@@ -19,10 +19,11 @@ import {
   TrendingUp,
   DollarSign,
   BookOpen,
-  GraduationCap
+  GraduationCap,
+  IndianRupee
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 
 interface StudentProfile {
   id: string;
@@ -393,7 +394,7 @@ export function StudentDashboard() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <IndianRupee className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{formatCurrency(stats.monthly_expenses)}</div>

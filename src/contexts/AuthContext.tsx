@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '@/types';
 import type { DbProfile } from '@/types/database-models';
 import { supabase } from '@/lib/supabase';
@@ -25,7 +25,7 @@ interface AuthContextType {
 }
 
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_BASE_URL = 'http://localhost:3001';
 
@@ -334,12 +334,4 @@ const login = async (email: string, password: string): Promise<{ success: boolea
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }
