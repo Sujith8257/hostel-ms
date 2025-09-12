@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   User, 
   Calendar, 
@@ -13,14 +12,8 @@ import {
   Home,
   Building2,
   HelpCircle,
-  Phone,
-  Mail,
   CreditCard,
   FileText,
-  Download,
-  TrendingUp,
-  DollarSign,
-  BookOpen,
   GraduationCap,
   Edit,
   Save,
@@ -71,11 +64,9 @@ export function StudentProfilePage() {
     console.log('[StudentProfilePage] Logout button clicked');
     try {
       await logout();
-      console.log('[StudentProfilePage] Logout successful, navigating to landing page');
-      navigate('/', { replace: true });
+      // Navigation is now handled by the AuthContext logout function
     } catch (error) {
       console.error('[StudentProfilePage] Logout failed:', error);
-      navigate('/', { replace: true });
     }
   };
 
@@ -95,34 +86,101 @@ export function StudentProfilePage() {
     { name: 'Room Details', icon: Building2, href: '/student-room', current: false },
     { name: 'Payments', icon: CreditCard, href: '/student-payments', current: false },
     { name: 'Attendance', icon: Calendar, href: '/student-attendance', current: false },
-  ];
-
-  // Quick actions
-  const quickActions = [
-    { name: 'Mess Menu', icon: FileText, href: '/mess-menu' },
-    { name: 'Complaints', icon: Bell, href: '/complaints' },
-    { name: 'Help & Support', icon: HelpCircle, href: '/help' },
+    { name: 'Notifications', icon: Bell, href: '/student-notifications', badge: 3, current: false },
+    { name: 'Documents', icon: FileText, href: '/student-documents', current: false },
+    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },
   ];
 
   if (!profile) {
     return (
       <div className="min-h-screen bg-background">
         <div className="flex">
-          {/* Sidebar */}
-          <div className="w-64 bg-card border-r border-border">
-            <div className="p-6">
-              {/* Logo */}
-              <div className="flex items-center space-x-3 mb-8">
-                <div className="p-2 bg-primary rounded-lg">
-                  <GraduationCap className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold">Student Portal</h1>
-                  <p className="text-sm text-muted-foreground">Hostel Management System</p>
-                </div>
+        {/* Sidebar */}
+        <div className="w-64 bg-card border-r border-border">
+          <div className="p-6">
+            {/* Logo */}
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="p-2 bg-primary rounded-lg">
+                <GraduationCap className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Student Portal</h1>
+                <p className="text-sm text-muted-foreground">Hostel Management System</p>
               </div>
             </div>
+
+            {/* Main Navigation */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Student Menu
+              </h3>
+              <nav className="space-y-2">
+                {navigationItems.map((item) => (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      item.current
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                    {item.badge && (
+                      <Badge variant="destructive" className="ml-auto">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Quick Actions
+              </h3>
+              <div className="space-y-2">
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download Mess Menu
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Request Document
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Report Issue
+                </Button>
+              </div>
+            </div>
+
+            {/* User Info */}
+            <div className="mt-auto pt-6 border-t border-border">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-2 bg-muted rounded-lg">
+                  <User className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{user?.name || 'Student'}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email?.split('@')[0] || 'SU'}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="w-full justify-start"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Log out
+              </Button>
+            </div>
           </div>
+        </div>
 
           {/* Main Content */}
           <div className="flex-1">
@@ -155,7 +213,7 @@ export function StudentProfilePage() {
             {/* Main Navigation */}
             <div className="mb-8">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                Main Navigation
+                Student Menu
               </h3>
               <nav className="space-y-2">
                 {navigationItems.map((item) => (
@@ -170,6 +228,11 @@ export function StudentProfilePage() {
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.name}</span>
+                    {item.badge && (
+                      <Badge variant="destructive" className="ml-auto">
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 ))}
               </nav>
@@ -181,16 +244,18 @@ export function StudentProfilePage() {
                 Quick Actions
               </h3>
               <div className="space-y-2">
-                {quickActions.map((action) => (
-                  <Link
-                    key={action.name}
-                    to={action.href}
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <action.icon className="h-4 w-4" />
-                    <span>{action.name}</span>
-                  </Link>
-                ))}
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download Mess Menu
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Request Document
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Report Issue
+                </Button>
               </div>
             </div>
 

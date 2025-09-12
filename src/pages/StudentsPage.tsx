@@ -95,7 +95,7 @@ export function StudentsPage() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    // Navigation is now handled by the AuthContext logout function
   };
 
   // Navigation items (same as AdminDashboard)

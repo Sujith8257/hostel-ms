@@ -21,15 +21,14 @@ import {
   User
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export function AdminDashboard() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    // Navigation is now handled by the AuthContext logout function
   };
 
   const navigationItems = [

@@ -101,11 +101,9 @@ export function StudentRoomDetailsPage() {
     console.log('[StudentRoomDetailsPage] Logout button clicked');
     try {
       await logout();
-      console.log('[StudentRoomDetailsPage] Logout successful, navigating to landing page');
-      navigate('/', { replace: true });
+      // Navigation is now handled by the AuthContext logout function
     } catch (error) {
       console.error('[StudentRoomDetailsPage] Logout failed:', error);
-      navigate('/', { replace: true });
     }
   };
 
@@ -143,13 +141,9 @@ export function StudentRoomDetailsPage() {
     { name: 'Room Details', icon: Building2, href: '/student-room', current: true },
     { name: 'Payments', icon: CreditCard, href: '/student-payments', current: false },
     { name: 'Attendance', icon: Calendar, href: '/student-attendance', current: false },
-  ];
-
-  // Quick actions
-  const quickActions = [
-    { name: 'Mess Menu', icon: FileText, href: '/mess-menu' },
-    { name: 'Complaints', icon: Bell, href: '/complaints' },
-    { name: 'Help & Support', icon: HelpCircle, href: '/help' },
+    { name: 'Notifications', icon: Bell, href: '/student-notifications', badge: 3, current: false },
+    { name: 'Documents', icon: FileText, href: '/student-documents', current: false },
+    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },
   ];
 
   console.log('[StudentRoomDetailsPage] Rendering, roomDetails:', roomDetails);
@@ -176,7 +170,7 @@ export function StudentRoomDetailsPage() {
               {/* Main Navigation */}
               <div className="mb-8">
                 <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                  Main Navigation
+                  Student Menu
                 </h3>
                 <nav className="space-y-2">
                   {navigationItems.map((item) => (
@@ -191,6 +185,11 @@ export function StudentRoomDetailsPage() {
                     >
                       <item.icon className="h-4 w-4" />
                       <span>{item.name}</span>
+                      {item.badge && (
+                        <Badge variant="destructive" className="ml-auto">
+                          {item.badge}
+                        </Badge>
+                      )}
                     </Link>
                   ))}
                 </nav>
@@ -202,16 +201,18 @@ export function StudentRoomDetailsPage() {
                   Quick Actions
                 </h3>
                 <div className="space-y-2">
-                  {quickActions.map((action) => (
-                    <Link
-                      key={action.name}
-                      to={action.href}
-                      className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                    >
-                      <action.icon className="h-4 w-4" />
-                      <span>{action.name}</span>
-                    </Link>
-                  ))}
+                  <Button variant="outline" size="sm" className="w-full justify-start">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Download Mess Menu
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Request Document
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start">
+                    <Bell className="h-4 w-4 mr-2" />
+                    Report Issue
+                  </Button>
                 </div>
               </div>
 
@@ -273,7 +274,7 @@ export function StudentRoomDetailsPage() {
             {/* Main Navigation */}
             <div className="mb-8">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                Main Navigation
+                Student Menu
               </h3>
               <nav className="space-y-2">
                 {navigationItems.map((item) => (
@@ -288,6 +289,11 @@ export function StudentRoomDetailsPage() {
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.name}</span>
+                    {item.badge && (
+                      <Badge variant="destructive" className="ml-auto">
+                        {item.badge}
+                      </Badge>
+                    )}
                   </Link>
                 ))}
               </nav>
@@ -299,16 +305,18 @@ export function StudentRoomDetailsPage() {
                 Quick Actions
               </h3>
               <div className="space-y-2">
-                {quickActions.map((action) => (
-                  <Link
-                    key={action.name}
-                    to={action.href}
-                    className="flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  >
-                    <action.icon className="h-4 w-4" />
-                    <span>{action.name}</span>
-                  </Link>
-                ))}
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download Mess Menu
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Request Document
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start">
+                  <Bell className="h-4 w-4 mr-2" />
+                  Report Issue
+                </Button>
               </div>
             </div>
 

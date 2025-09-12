@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { 
   User, 
   Calendar, 
@@ -15,57 +14,30 @@ import {
   Mail,
   CreditCard,
   FileText,
-  Download,
   TrendingUp,
-  DollarSign,
   BookOpen,
   GraduationCap,
   IndianRupee
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
 
 interface StudentProfile {
   id: string;
-  name: string;
-  email: string;
-  phone: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
   register_number: string;
   room_number: string | null;
-  hostel_status: 'resident' | 'day_scholar';
-  course: string;
-  year: number;
+  hostel_status: 'resident' | 'day_scholar' | 'former_resident';
   profile_image_url: string | null;
   is_active: boolean;
-}
-
-interface RoomInfo {
-  room_number: string;
-  building: string;
-  floor: number;
-  capacity: number;
-  occupied: number;
-  amenities: string[];
-  monthly_rent: number;
-}
-
-interface PaymentInfo {
-  id: string;
-  amount: number;
-  due_date: string;
-  status: 'paid' | 'pending' | 'overdue';
-  description: string;
-  payment_date?: string;
-}
-
-interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  priority: 'high' | 'medium' | 'low';
   created_at: string;
-  expires_at?: string;
+  updated_at: string;
+  building_id: string | null;
 }
+
 
 interface StudentStats {
   attendance_percentage: number;
@@ -77,25 +49,23 @@ interface StudentStats {
 }
 
 export function StudentDashboard() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState<StudentProfile | null>(null);
-  const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);
-  const [payments, setPayments] = useState<PaymentInfo[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [stats, setStats] = useState<StudentStats>({
-    attendance_percentage: 0,
-    monthly_expenses: 0,
-    upcoming_events: 0,
-    unread_notifications: 0,
-    room_occupancy: 0,
-    academic_progress: 0,
+  const { profile, logout } = useAuth();
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats] = useState<StudentStats>({
+    attendance_percentage: 85,
+    monthly_expenses: 7000,
+    upcoming_events: 3,
+    unread_notifications: 3,
+    room_occupancy: 100,
+    academic_progress: 78,
   });
 
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/');
+      // Navigation is now handled by the AuthContext logout function
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -110,126 +80,79 @@ export function StudentDashboard() {
     { name: 'Attendance', icon: Calendar, href: '/student-attendance', current: false },
     { name: 'Notifications', icon: Bell, href: '/student-notifications', badge: 3, current: false },
     { name: 'Documents', icon: FileText, href: '/student-documents', current: false },
-    { name: 'Help & Support', icon: HelpCircle, href: '/help', current: false },
+    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },
   ];
 
-  // Load mock data
+  // Load real student data
   useEffect(() => {
-    const mockProfile: StudentProfile = {
-      id: '1',
-      name: 'John Doe',
-      email: 'john.doe@university.edu',
-      phone: '+1234567890',
-      register_number: 'REG001',
-      room_number: 'A-101',
-      hostel_status: 'resident',
-      course: 'Computer Science',
-      year: 3,
-      profile_image_url: null,
-      is_active: true,
+    const fetchStudentData = async () => {
+      if (!profile?.email) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        console.log('[StudentDashboard] Fetching student data for email:', profile.email);
+        
+        // Fetch student data from the students table using email
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('*')
+          .eq('email', profile.email)
+          .single();
+
+        if (studentError) {
+          console.log('[StudentDashboard] No student record found, using profile data:', studentError);
+          // If no student record found, create a basic student profile from the profile data
+          const basicStudentProfile: StudentProfile = {
+            id: profile.id,
+            full_name: profile.full_name,
+            email: profile.email,
+            phone: null,
+            register_number: 'N/A',
+            room_number: null,
+            hostel_status: 'resident',
+            profile_image_url: null,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            building_id: null,
+          };
+          setStudentProfile(basicStudentProfile);
+          return;
+        }
+
+        if (studentData) {
+          console.log('[StudentDashboard] Student data fetched:', studentData);
+          setStudentProfile(studentData as StudentProfile);
+        }
+      } catch (error) {
+        console.error('[StudentDashboard] Error in fetchStudentData:', error);
+        // Create a basic student profile from the profile data as fallback
+        const basicStudentProfile: StudentProfile = {
+          id: profile.id,
+          full_name: profile.full_name,
+          email: profile.email,
+          phone: null,
+          register_number: 'N/A',
+          room_number: null,
+          hostel_status: 'resident',
+          profile_image_url: null,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          building_id: null,
+        };
+        setStudentProfile(basicStudentProfile);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    const mockRoomInfo: RoomInfo = {
-      room_number: 'A-101',
-      building: 'Block A',
-      floor: 1,
-      capacity: 2,
-      occupied: 2,
-      amenities: ['WiFi', 'AC', 'Study Table', 'Wardrobe'],
-      monthly_rent: 5000,
-    };
-
-    const mockPayments: PaymentInfo[] = [
-      {
-        id: '1',
-        amount: 5000,
-        due_date: '2024-01-15',
-        status: 'paid',
-        description: 'Monthly Hostel Fee - January 2024',
-        payment_date: '2024-01-10',
-      },
-      {
-        id: '2',
-        amount: 5000,
-        due_date: '2024-02-15',
-        status: 'pending',
-        description: 'Monthly Hostel Fee - February 2024',
-      },
-      {
-        id: '3',
-        amount: 2000,
-        due_date: '2024-01-20',
-        status: 'overdue',
-        description: 'Mess Fee - January 2024',
-      },
-    ];
-
-    const mockAnnouncements: Announcement[] = [
-      {
-        id: '1',
-        title: 'Hostel Maintenance Notice',
-        content: 'Scheduled maintenance for water supply system on January 25th, 2024. Water will be unavailable from 9 AM to 3 PM.',
-        priority: 'high',
-        created_at: '2024-01-20T10:00:00Z',
-        expires_at: '2024-01-25T23:59:59Z',
-      },
-      {
-        id: '2',
-        title: 'Mess Menu Update',
-        content: 'New vegetarian and non-vegetarian options added to the mess menu. Check the updated menu at the dining hall.',
-        priority: 'medium',
-        created_at: '2024-01-19T14:30:00Z',
-      },
-      {
-        id: '3',
-        title: 'Library Hours Extension',
-        content: 'Library will remain open until 11 PM during exam period (January 22 - February 5).',
-        priority: 'low',
-        created_at: '2024-01-18T09:15:00Z',
-        expires_at: '2024-02-05T23:59:59Z',
-      },
-    ];
-
-    setProfile(mockProfile);
-    setRoomInfo(mockRoomInfo);
-    setPayments(mockPayments);
-    setAnnouncements(mockAnnouncements);
-
-    setStats({
-      attendance_percentage: 85,
-      monthly_expenses: 7000,
-      upcoming_events: 3,
-      unread_notifications: 3,
-      room_occupancy: 100,
-      academic_progress: 78,
-    });
-  }, []);
-
-  const getPaymentStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return <Badge className="bg-green-100 text-green-800">Paid</Badge>;
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
-      case 'overdue':
-        return <Badge className="bg-red-100 text-red-800">Overdue</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <Badge className="bg-red-100 text-red-800">High</Badge>;
-      case 'medium':
-        return <Badge className="bg-yellow-100 text-yellow-800">Medium</Badge>;
-      case 'low':
-        return <Badge className="bg-green-100 text-green-800">Low</Badge>;
-      default:
-        return <Badge variant="outline">{priority}</Badge>;
-    }
-  };
+    fetchStudentData();
+  }, [profile?.email, profile?.full_name, profile?.id]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -238,13 +161,33 @@ export function StudentDashboard() {
     }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  // Show loading only if we don't have profile data yet
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Error Loading Data</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -319,8 +262,8 @@ export function StudentDashboard() {
                   <User className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{profile?.name || 'Student'}</p>
-                  <p className="text-xs text-muted-foreground">{profile?.email?.split('@')[0] || 'SU'}</p>
+                  <p className="text-sm font-medium">{studentProfile?.full_name || profile?.full_name || 'Student'}</p>
+                  <p className="text-xs text-muted-foreground">{(studentProfile?.email || profile?.email)?.split('@')[0] || 'SU'}</p>
                 </div>
               </div>
               <Button
@@ -343,7 +286,13 @@ export function StudentDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold">Student Dashboard</h1>
-                <p className="text-muted-foreground">Welcome back, {profile?.name || 'Student'}! Here's your overview.</p>
+                <p className="text-muted-foreground">Welcome back, {studentProfile?.full_name || profile?.full_name || 'Student'}! Here's your overview.</p>
+                {isLoading && (
+                  <div className="flex items-center mt-2 text-sm text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                    Loading additional data...
+                  </div>
+                )}
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -351,7 +300,7 @@ export function StudentDashboard() {
                     <User className="h-4 w-4" />
                   </div>
                   <Badge variant="secondary">Student</Badge>
-                  <span className="text-sm text-muted-foreground">{profile?.register_number || 'REG001'}</span>
+                  <span className="text-sm text-muted-foreground">{studentProfile?.register_number || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -365,18 +314,18 @@ export function StudentDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-2xl font-bold mb-2">Welcome back, {profile?.name}!</h2>
+                      <h2 className="text-2xl font-bold mb-2">Welcome back, {studentProfile?.full_name || profile?.full_name}!</h2>
                       <p className="text-muted-foreground mb-4">
-                        {profile?.course} - Year {profile?.year} | Room {profile?.room_number || 'Not Assigned'}
+                        {studentProfile?.hostel_status || 'Student'} | Room {studentProfile?.room_number || 'Not Assigned'}
                       </p>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-1">
                           <Mail className="h-4 w-4" />
-                          <span>{profile?.email}</span>
+                          <span>{studentProfile?.email || profile?.email || 'No email'}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Phone className="h-4 w-4" />
-                          <span>{profile?.phone}</span>
+                          <span>{studentProfile?.phone || 'No phone'}</span>
                         </div>
                       </div>
                     </div>
@@ -394,7 +343,8 @@ export function StudentDashboard() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Monthly Expenses</CardTitle>
-                  <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                  <IndianRupee
+                   className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{formatCurrency(stats.monthly_expenses)}</div>
@@ -450,35 +400,18 @@ export function StudentDashboard() {
                   <CardDescription>Your current room details and occupancy</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {roomInfo ? (
+                  {studentProfile?.room_number ? (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="font-medium">Room {roomInfo.room_number}</h4>
-                          <p className="text-sm text-muted-foreground">{roomInfo.building} - Floor {roomInfo.floor}</p>
+                          <h4 className="font-medium">Room {studentProfile.room_number}</h4>
+                          <p className="text-sm text-muted-foreground">Hostel Accommodation</p>
                         </div>
-                        <Badge variant="outline">{roomInfo.occupied}/{roomInfo.capacity} Occupied</Badge>
+                        <Badge variant="outline">{studentProfile.hostel_status}</Badge>
                       </div>
                       <div>
-                        <div className="flex items-center justify-between text-sm mb-2">
-                          <span>Occupancy</span>
-                          <span>{Math.round((roomInfo.occupied / roomInfo.capacity) * 100)}%</span>
-                        </div>
-                        <Progress value={(roomInfo.occupied / roomInfo.capacity) * 100} className="h-2" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium mb-2">Amenities</p>
-                        <div className="flex flex-wrap gap-1">
-                          {roomInfo.amenities.map((amenity) => (
-                            <Badge key={amenity} variant="secondary" className="text-xs">
-                              {amenity}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="pt-2 border-t">
                         <p className="text-sm text-muted-foreground">
-                          Monthly Rent: <span className="font-medium">{formatCurrency(roomInfo.monthly_rent)}</span>
+                          Status: <span className="font-medium">{studentProfile.is_active ? 'Active' : 'Inactive'}</span>
                         </p>
                       </div>
                     </div>
@@ -496,23 +429,12 @@ export function StudentDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {payments.slice(0, 3).map((payment) => (
-                      <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                          <p className="font-medium text-sm">{payment.description}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Due: {formatDate(payment.due_date)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">{formatCurrency(payment.amount)}</p>
-                          {getPaymentStatusBadge(payment.status)}
-                        </div>
-                      </div>
-                    ))}
-                    <Button variant="outline" size="sm" className="w-full">
-                      View All Payments
-                    </Button>
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">Payment information will be available soon</p>
+                      <Button variant="outline" size="sm" className="mt-2">
+                        View All Payments
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -526,24 +448,12 @@ export function StudentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {announcements.map((announcement) => (
-                    <div key={announcement.id} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-medium">{announcement.title}</h4>
-                        {getPriorityBadge(announcement.priority)}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2">{announcement.content}</p>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Posted: {formatDate(announcement.created_at)}</span>
-                        {announcement.expires_at && (
-                          <span>Expires: {formatDate(announcement.expires_at)}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <Button variant="outline" size="sm" className="w-full">
-                    View All Announcements
-                  </Button>
+                  <div className="text-center py-4">
+                    <p className="text-muted-foreground">Announcements will be available soon</p>
+                    <Button variant="outline" size="sm" className="mt-2">
+                      View All Announcements
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

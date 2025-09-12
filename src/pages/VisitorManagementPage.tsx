@@ -83,7 +83,7 @@ export function VisitorManagementPage() {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/');
+      // Navigation is now handled by the AuthContext logout function
     } catch (error) {
       console.error('Logout failed:', error);
     }

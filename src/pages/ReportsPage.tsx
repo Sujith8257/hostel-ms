@@ -30,11 +30,9 @@ export function ReportsPage() {
     console.log('[ReportsPage] Logout button clicked');
     try {
       await logout();
-      console.log('[ReportsPage] Logout successful, navigating to landing page');
-      navigate('/', { replace: true });
+      // Navigation is now handled by the AuthContext logout function
     } catch (error) {
       console.error('[ReportsPage] Logout failed:', error);
-      navigate('/', { replace: true });
     }
   };
 

@@ -13,103 +13,164 @@ import {
   CreditCard,
   FileText,
   GraduationCap,
-  Download,
-  Eye,
   CheckCircle,
   XCircle,
-  Clock,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
-interface Payment {
+interface Notification {
   id: string;
-  amount: number;
-  due_date: string;
-  paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
-  description: string;
-  payment_method: string | null;
-  transaction_id: string | null;
+  title: string;
+  content: string;
+  type: 'announcement' | 'payment' | 'maintenance' | 'event' | 'urgent';
+  priority: 'high' | 'medium' | 'low';
+  is_read: boolean;
+  created_at: string;
+  expires_at?: string;
+  action_required: boolean;
 }
 
-export function StudentPaymentsPage() {
+export function StudentNotificationsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Mock payments data - replace with actual API call
+  // Mock notifications data - replace with actual API call
   useEffect(() => {
-    console.log('[StudentPaymentsPage] Component mounted, setting up mock data');
-    const mockPayments: Payment[] = [
+    console.log('[StudentNotificationsPage] Component mounted, setting up mock data');
+    const mockNotifications: Notification[] = [
       {
         id: '1',
-        amount: 5000,
-        due_date: '2024-01-15',
-        paid_date: '2024-01-10',
-        status: 'paid',
-        description: 'Monthly Hostel Fee - January 2024',
-        payment_method: 'UPI',
-        transaction_id: 'TXN123456789'
+        title: 'Hostel Maintenance Notice',
+        content: 'Scheduled maintenance for water supply system on January 25th, 2024. Water will be unavailable from 9 AM to 3 PM.',
+        type: 'maintenance',
+        priority: 'high',
+        is_read: false,
+        created_at: '2024-01-20T10:00:00Z',
+        expires_at: '2024-01-25T23:59:59Z',
+        action_required: false
       },
       {
         id: '2',
-        amount: 5000,
-        due_date: '2024-02-15',
-        paid_date: null,
-        status: 'pending',
-        description: 'Monthly Hostel Fee - February 2024',
-        payment_method: null,
-        transaction_id: null
+        title: 'Payment Overdue',
+        content: 'Your mess fee payment of ₹2,000 is overdue. Please make the payment immediately to avoid any inconvenience.',
+        type: 'payment',
+        priority: 'high',
+        is_read: false,
+        created_at: '2024-01-19T14:30:00Z',
+        action_required: true
       },
       {
         id: '3',
-        amount: 2000,
-        due_date: '2024-01-20',
-        paid_date: null,
-        status: 'overdue',
-        description: 'Mess Fee - January 2024',
-        payment_method: null,
-        transaction_id: null
+        title: 'Mess Menu Update',
+        content: 'New vegetarian and non-vegetarian options added to the mess menu. Check the updated menu at the dining hall.',
+        type: 'announcement',
+        priority: 'medium',
+        is_read: true,
+        created_at: '2024-01-19T14:30:00Z',
+        action_required: false
+      },
+      {
+        id: '4',
+        title: 'Cultural Event - Hostel Night',
+        content: 'Join us for the annual hostel cultural night on February 15th, 2024. Registration is now open.',
+        type: 'event',
+        priority: 'medium',
+        is_read: false,
+        created_at: '2024-01-18T09:15:00Z',
+        expires_at: '2024-02-15T23:59:59Z',
+        action_required: true
+      },
+      {
+        id: '5',
+        title: 'Library Hours Extension',
+        content: 'Library will remain open until 11 PM during exam period (January 22 - February 5).',
+        type: 'announcement',
+        priority: 'low',
+        is_read: true,
+        created_at: '2024-01-18T09:15:00Z',
+        expires_at: '2024-02-05T23:59:59Z',
+        action_required: false
+      },
+      {
+        id: '6',
+        title: 'URGENT: Fire Drill Tomorrow',
+        content: 'Mandatory fire drill will be conducted tomorrow at 10 AM. All students must participate.',
+        type: 'urgent',
+        priority: 'high',
+        is_read: false,
+        created_at: '2024-01-17T16:00:00Z',
+        action_required: true
       }
     ];
 
-    console.log('[StudentPaymentsPage] Setting payments:', mockPayments);
-    setPayments(mockPayments);
+    console.log('[StudentNotificationsPage] Setting notifications:', mockNotifications);
+    setNotifications(mockNotifications);
   }, []);
 
   const handleLogout = async () => {
-    console.log('[StudentPaymentsPage] Logout button clicked');
+    console.log('[StudentNotificationsPage] Logout button clicked');
     try {
       await logout();
       // Navigation is now handled by the AuthContext logout function
     } catch (error) {
-      console.error('[StudentPaymentsPage] Logout failed:', error);
+      console.error('[StudentNotificationsPage] Logout failed:', error);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusMap = {
-      'paid': { variant: 'default' as const, icon: CheckCircle, text: 'Paid' },
-      'pending': { variant: 'secondary' as const, icon: Clock, text: 'Pending' },
-      'overdue': { variant: 'destructive' as const, icon: XCircle, text: 'Overdue' }
+  const getNotificationIcon = (type: string) => {
+    const iconMap = {
+      'announcement': Info,
+      'payment': CreditCard,
+      'maintenance': AlertTriangle,
+      'event': Calendar,
+      'urgent': Bell
     };
-    return statusMap[status as keyof typeof statusMap] || statusMap.pending;
+    return iconMap[type as keyof typeof iconMap] || Info;
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
+  const getNotificationColor = (type: string, priority: string) => {
+    if (type === 'urgent' || priority === 'high') return 'text-red-600';
+    if (priority === 'medium') return 'text-yellow-600';
+    return 'text-blue-600';
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const priorityMap = {
+      'high': { variant: 'destructive' as const, text: 'High' },
+      'medium': { variant: 'secondary' as const, text: 'Medium' },
+      'low': { variant: 'outline' as const, text: 'Low' }
+    };
+    return priorityMap[priority as keyof typeof priorityMap] || priorityMap.low;
   };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-IN', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
+  };
+
+  const markAsRead = (notificationId: string) => {
+    setNotifications(prev => 
+      prev.map(notification => 
+        notification.id === notificationId 
+          ? { ...notification, is_read: true }
+          : notification
+      )
+    );
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, is_read: true }))
+    );
   };
 
   // Navigation items for students
@@ -117,17 +178,20 @@ export function StudentPaymentsPage() {
     { name: 'Dashboard', icon: Home, href: '/student', current: false },
     { name: 'My Profile', icon: User, href: '/student-profile', current: false },
     { name: 'Room Details', icon: Building2, href: '/student-room', current: false },
-    { name: 'Payments', icon: CreditCard, href: '/student-payments', current: true },
+    { name: 'Payments', icon: CreditCard, href: '/student-payments', current: false },
     { name: 'Attendance', icon: Calendar, href: '/student-attendance', current: false },
-    { name: 'Notifications', icon: Bell, href: '/student-notifications', badge: 3, current: false },
+    { name: 'Notifications', icon: Bell, href: '/student-notifications', badge: notifications.filter(n => !n.is_read).length, current: true },
     { name: 'Documents', icon: FileText, href: '/student-documents', current: false },
-    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },
+    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },  
   ];
 
-  console.log('[StudentPaymentsPage] Rendering, payments:', payments);
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const urgentCount = notifications.filter(n => n.type === 'urgent' && !n.is_read).length;
 
-  if (!payments.length) {
-    console.log('[StudentPaymentsPage] No payments, showing loading state');
+  console.log('[StudentNotificationsPage] Rendering, notifications:', notifications);
+
+  if (!notifications.length) {
+    console.log('[StudentNotificationsPage] No notifications, showing loading state');
     return (
       <div className="min-h-screen bg-background">
         <div className="flex">
@@ -222,7 +286,7 @@ export function StudentPaymentsPage() {
           <div className="flex-1">
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <p className="ml-2">Loading payments...</p>
+              <p className="ml-2">Loading notifications...</p>
             </div>
           </div>
         </div>
@@ -230,7 +294,7 @@ export function StudentPaymentsPage() {
     );
   }
 
-  console.log('[StudentPaymentsPage] Rendering main content with payments');
+  console.log('[StudentNotificationsPage] Rendering main content with notifications');
 
   return (
     <div className="min-h-screen bg-background">
@@ -328,8 +392,8 @@ export function StudentPaymentsPage() {
           <div className="bg-card border-b border-border px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Payments</h1>
-                <p className="text-muted-foreground">Manage your hostel and mess payments</p>
+                <h1 className="text-2xl font-bold">Notifications</h1>
+                <p className="text-muted-foreground">Stay updated with hostel announcements and important notices</p>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -339,36 +403,27 @@ export function StudentPaymentsPage() {
                   <Badge variant="secondary">Student</Badge>
                   <span className="text-sm text-muted-foreground">{user?.email?.split('@')[0] || 'SU'}</span>
                 </div>
+                <Button onClick={markAllAsRead} disabled={unreadCount === 0}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Mark All Read
+                </Button>
               </div>
             </div>
           </div>
 
-          {/* Payments Content */}
+          {/* Notifications Content */}
           <div className="p-6">
-            {/* Payment Summary */}
+            {/* Notification Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-green-100 rounded-full">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <Bell className="h-6 w-6 text-blue-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Paid</p>
-                      <p className="text-2xl font-bold">{payments.filter(p => p.status === 'paid').length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-yellow-100 rounded-full">
-                      <Clock className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                      <p className="text-2xl font-bold">{payments.filter(p => p.status === 'pending').length}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Total</p>
+                      <p className="text-2xl font-bold">{notifications.length}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -380,71 +435,95 @@ export function StudentPaymentsPage() {
                       <XCircle className="h-6 w-6 text-red-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-                      <p className="text-2xl font-bold">{payments.filter(p => p.status === 'overdue').length}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Unread</p>
+                      <p className="text-2xl font-bold">{unreadCount}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-orange-100 rounded-full">
+                      <AlertTriangle className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Urgent</p>
+                      <p className="text-2xl font-bold">{urgentCount}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Payment History */}
+            {/* Notifications List */}
             <Card>
               <CardHeader>
-                <CardTitle>Payment History</CardTitle>
+                <CardTitle>All Notifications</CardTitle>
                 <CardDescription>
-                  View all your payment transactions and pending dues
+                  {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All notifications read'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {payments.map((payment) => {
-                    const statusInfo = getStatusBadge(payment.status);
-                    const StatusIcon = statusInfo.icon;
+                  {notifications.map((notification) => {
+                    const NotificationIcon = getNotificationIcon(notification.type);
+                    const priorityInfo = getPriorityBadge(notification.priority);
+                    const iconColor = getNotificationColor(notification.type, notification.priority);
                     
                     return (
-                      <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center space-x-4">
-                          <div className="p-2 bg-muted rounded-lg">
-                            <StatusIcon className="h-5 w-5" />
+                      <div 
+                        key={notification.id} 
+                        className={`p-4 border rounded-lg hover:bg-muted/50 transition-colors ${
+                          !notification.is_read ? 'bg-blue-50 border-blue-200' : ''
+                        }`}
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div className={`p-2 rounded-lg ${!notification.is_read ? 'bg-blue-100' : 'bg-muted'}`}>
+                            <NotificationIcon className={`h-5 w-5 ${iconColor}`} />
                           </div>
-                          <div>
-                            <h4 className="font-medium">{payment.description}</h4>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <span>Due: {formatDate(payment.due_date)}</span>
-                              {payment.paid_date && (
-                                <span>Paid: {formatDate(payment.paid_date)}</span>
-                              )}
-                              {payment.payment_method && (
-                                <span>Method: {payment.payment_method}</span>
-                              )}
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <h4 className={`font-medium ${!notification.is_read ? 'text-blue-900' : ''}`}>
+                                  {notification.title}
+                                  {!notification.is_read && (
+                                    <span className="ml-2 w-2 h-2 bg-blue-600 rounded-full inline-block"></span>
+                                  )}
+                                </h4>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  {notification.content}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <Badge variant={priorityInfo.variant}>
+                                  {priorityInfo.text}
+                                </Badge>
+                                {notification.action_required && (
+                                  <Badge variant="outline" className="text-orange-600 border-orange-200">
+                                    Action Required
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                          <div className="text-right">
-                            <p className="text-lg font-bold">{formatCurrency(payment.amount)}</p>
-                            <Badge variant={statusInfo.variant} className="mt-1">
-                              {statusInfo.text}
-                            </Badge>
-                          </div>
-                          <div className="flex space-x-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-2" />
-                              View
-                            </Button>
-                            {payment.status !== 'paid' && (
-                              <Button size="sm">
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Pay Now
-                              </Button>
-                            )}
-                            {payment.status === 'paid' && (
-                              <Button variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Receipt
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{formatDate(notification.created_at)}</span>
+                              <div className="flex items-center space-x-2">
+                                {notification.expires_at && (
+                                  <span>Expires: {formatDate(notification.expires_at)}</span>
+                                )}
+                                {!notification.is_read && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => markAsRead(notification.id)}
+                                    className="h-6 px-2 text-xs"
+                                  >
+                                    Mark as Read
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>

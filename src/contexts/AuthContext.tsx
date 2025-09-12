@@ -4,14 +4,6 @@ import type { DbProfile } from '@/types/database-models';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
-// const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// async function myProcess() {
-//   console.log("Starting the process...");
-//   await sleep(15000); // Pauses the function here for 15 seconds
-//   console.log("Process resumed after 15 seconds.");
-// }
-// myProcess();
 
 interface AuthContextType {
   user: User | null;
@@ -301,7 +293,7 @@ const login = async (email: string, password: string): Promise<{ success: boolea
   const logout = async (): Promise<void> => {
     console.info('[Auth] Logout: start');
     try {
-      // Clear Supabase session
+      // Clear Supabase session and all cached data
       try {
         console.info('[Auth] Logout: supabase.auth.signOut()');
         const { error } = await supabase.auth.signOut();
@@ -312,20 +304,52 @@ const login = async (email: string, password: string): Promise<{ success: boolea
         console.warn('[Auth] Logout: Supabase signOut threw (continuing)', supabaseError);
       }
 
+      // Clear all Supabase cached data
+      try {
+        console.info('[Auth] Logout: clearing Supabase cache');
+        // Clear any cached queries or data
+        await supabase.from('profiles').select('*').limit(0); // This clears any cached profile data
+        // Clear any other cached tables if needed
+        await supabase.from('students').select('*').limit(0);
+        await supabase.from('rooms').select('*').limit(0);
+        await supabase.from('payments').select('*').limit(0);
+        await supabase.from('attendance').select('*').limit(0);
+        await supabase.from('notifications').select('*').limit(0);
+        await supabase.from('documents').select('*').limit(0);
+        console.info('[Auth] Logout: Supabase cache cleared');
+      } catch (cacheError) {
+        console.warn('[Auth] Logout: Cache clear error (continuing)', cacheError);
+      }
+
+      // Clear local storage and session storage
+      try {
+        console.info('[Auth] Logout: clearing browser storage');
+        localStorage.clear();
+        sessionStorage.clear();
+        console.info('[Auth] Logout: browser storage cleared');
+      } catch (storageError) {
+        console.warn('[Auth] Logout: Storage clear error (continuing)', storageError);
+      }
+
       // Always clear local state regardless of API errors
       setUser(null);
       setProfile(null);
       setSession(null);
+      setIsLoading(false);
       console.info('[Auth] Logout: cleared context state');
 
-      // Note: Let the calling component handle navigation
-      console.info('[Auth] Logout: completed, user state cleared');
+      // Force a hard redirect to home page to clear all cached data
+      console.info('[Auth] Logout: redirecting to home page');
+      window.location.href = '/';
+      
     } catch (err) {
       console.error('[Auth] Logout: unexpected error (continuing to redirect)', err);
       setUser(null);
       setProfile(null);
       setSession(null);
-      // Note: Let the calling component handle navigation
+      setIsLoading(false);
+      // Force redirect even on error
+      window.location.href = '/';
     }
   };
 

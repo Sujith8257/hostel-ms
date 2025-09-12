@@ -11,6 +11,9 @@ import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { StudentRoomDetailsPage } from '@/pages/StudentRoomDetailsPage';
 import { StudentPaymentsPage } from '@/pages/StudentPaymentsPage';
 import { StudentAttendancePage } from '@/pages/StudentAttendancePage';
+import { StudentNotificationsPage } from '@/pages/StudentNotificationsPage';
+import { StudentDocumentsPage } from '@/pages/StudentDocumentsPage';
+import StudentHelpPage from '@/pages/StudentHelpPage';
 import { WardenDashboard } from '@/pages/WardenDashboard';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -57,6 +60,9 @@ function AppContent() {
         <Route path="/student-room" element={<StudentRoomDetailsPage />} />
         <Route path="/student-payments" element={<StudentPaymentsPage />} />
         <Route path="/student-attendance" element={<StudentAttendancePage />} />
+        <Route path="/student-notifications" element={<StudentNotificationsPage />} />
+        <Route path="/student-documents" element={<StudentDocumentsPage />} />
+        <Route path="/student-help" element={<StudentHelpPage />} />
         <Route path="/warden" element={<WardenDashboard />} />
         
         

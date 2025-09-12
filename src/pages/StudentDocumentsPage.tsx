@@ -15,93 +15,184 @@ import {
   GraduationCap,
   Download,
   Eye,
+  Upload,
+  File,
+  FileImage,
+  FileType,
   CheckCircle,
-  XCircle,
   Clock,
+  AlertCircle
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
-interface Payment {
+interface Document {
   id: string;
-  amount: number;
-  due_date: string;
-  paid_date: string | null;
-  status: 'pending' | 'paid' | 'overdue';
+  name: string;
+  type: 'form' | 'menu' | 'policy' | 'certificate' | 'receipt' | 'other';
+  category: 'hostel' | 'mess' | 'academic' | 'administrative';
+  status: 'available' | 'pending' | 'expired' | 'draft';
+  file_size: string;
+  last_updated: string;
+  download_count: number;
   description: string;
-  payment_method: string | null;
-  transaction_id: string | null;
+  is_required: boolean;
+  expires_at?: string;
 }
 
-export function StudentPaymentsPage() {
+export function StudentDocumentsPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
 
-  // Mock payments data - replace with actual API call
+  // Mock documents data - replace with actual API call
   useEffect(() => {
-    console.log('[StudentPaymentsPage] Component mounted, setting up mock data');
-    const mockPayments: Payment[] = [
+    console.log('[StudentDocumentsPage] Component mounted, setting up mock data');
+    const mockDocuments: Document[] = [
       {
         id: '1',
-        amount: 5000,
-        due_date: '2024-01-15',
-        paid_date: '2024-01-10',
-        status: 'paid',
-        description: 'Monthly Hostel Fee - January 2024',
-        payment_method: 'UPI',
-        transaction_id: 'TXN123456789'
+        name: 'Hostel Joining Form',
+        type: 'form',
+        category: 'hostel',
+        status: 'available',
+        file_size: '2.3 MB',
+        last_updated: '2024-01-15T10:00:00Z',
+        download_count: 45,
+        description: 'Official hostel joining form for new residents',
+        is_required: true
       },
       {
         id: '2',
-        amount: 5000,
-        due_date: '2024-02-15',
-        paid_date: null,
-        status: 'pending',
-        description: 'Monthly Hostel Fee - February 2024',
-        payment_method: null,
-        transaction_id: null
+        name: 'Mess Menu - January 2024',
+        type: 'menu',
+        category: 'mess',
+        status: 'available',
+        file_size: '1.8 MB',
+        last_updated: '2024-01-01T09:00:00Z',
+        download_count: 120,
+        description: 'Complete mess menu for January 2024 with all meal options',
+        is_required: false
       },
       {
         id: '3',
-        amount: 2000,
-        due_date: '2024-01-20',
-        paid_date: null,
-        status: 'overdue',
-        description: 'Mess Fee - January 2024',
-        payment_method: null,
-        transaction_id: null
+        name: 'Hostel Rules & Regulations',
+        type: 'policy',
+        category: 'hostel',
+        status: 'available',
+        file_size: '3.1 MB',
+        last_updated: '2024-01-10T14:30:00Z',
+        download_count: 89,
+        description: 'Complete hostel rules and regulations handbook',
+        is_required: true
+      },
+      {
+        id: '4',
+        name: 'Mess Fee Receipt - January 2024',
+        type: 'receipt',
+        category: 'mess',
+        status: 'available',
+        file_size: '0.5 MB',
+        last_updated: '2024-01-12T16:45:00Z',
+        download_count: 1,
+        description: 'Payment receipt for January 2024 mess fees',
+        is_required: false
+      },
+      {
+        id: '5',
+        name: 'Hostel Identity Card Application',
+        type: 'form',
+        category: 'hostel',
+        status: 'pending',
+        file_size: '1.2 MB',
+        last_updated: '2024-01-18T11:20:00Z',
+        download_count: 0,
+        description: 'Application form for hostel identity card',
+        is_required: true
+      },
+      {
+        id: '6',
+        name: 'Mess Menu - February 2024',
+        type: 'menu',
+        category: 'mess',
+        status: 'draft',
+        file_size: '1.9 MB',
+        last_updated: '2024-01-20T08:15:00Z',
+        download_count: 0,
+        description: 'Draft mess menu for February 2024 (coming soon)',
+        is_required: false,
+        expires_at: '2024-02-01T00:00:00Z'
+      },
+      {
+        id: '7',
+        name: 'Academic Transcript Request Form',
+        type: 'form',
+        category: 'academic',
+        status: 'available',
+        file_size: '0.8 MB',
+        last_updated: '2024-01-05T13:00:00Z',
+        download_count: 23,
+        description: 'Form to request official academic transcripts',
+        is_required: false
+      },
+      {
+        id: '8',
+        name: 'Hostel Maintenance Report',
+        type: 'other',
+        category: 'administrative',
+        status: 'expired',
+        file_size: '4.2 MB',
+        last_updated: '2023-12-15T10:30:00Z',
+        download_count: 12,
+        description: 'Monthly hostel maintenance report (expired)',
+        is_required: false,
+        expires_at: '2024-01-01T00:00:00Z'
       }
     ];
 
-    console.log('[StudentPaymentsPage] Setting payments:', mockPayments);
-    setPayments(mockPayments);
+    console.log('[StudentDocumentsPage] Setting documents:', mockDocuments);
+    setDocuments(mockDocuments);
   }, []);
 
   const handleLogout = async () => {
-    console.log('[StudentPaymentsPage] Logout button clicked');
+    console.log('[StudentDocumentsPage] Logout button clicked');
     try {
       await logout();
       // Navigation is now handled by the AuthContext logout function
     } catch (error) {
-      console.error('[StudentPaymentsPage] Logout failed:', error);
+      console.error('[StudentDocumentsPage] Logout failed:', error);
     }
+  };
+
+  const getFileIcon = (type: string) => {
+    const iconMap = {
+      'form': FileType,
+      'menu': FileImage,
+      'policy': FileText,
+      'certificate': FileText,
+      'receipt': FileText,
+      'other': File
+    };
+    return iconMap[type as keyof typeof iconMap] || File;
   };
 
   const getStatusBadge = (status: string) => {
     const statusMap = {
-      'paid': { variant: 'default' as const, icon: CheckCircle, text: 'Paid' },
-      'pending': { variant: 'secondary' as const, icon: Clock, text: 'Pending' },
-      'overdue': { variant: 'destructive' as const, icon: XCircle, text: 'Overdue' }
+      'available': { variant: 'default' as const, icon: CheckCircle, text: 'Available', color: 'text-green-600' },
+      'pending': { variant: 'secondary' as const, icon: Clock, text: 'Pending', color: 'text-yellow-600' },
+      'expired': { variant: 'destructive' as const, icon: AlertCircle, text: 'Expired', color: 'text-red-600' },
+      'draft': { variant: 'outline' as const, icon: FileText, text: 'Draft', color: 'text-gray-600' }
     };
-    return statusMap[status as keyof typeof statusMap] || statusMap.pending;
+    return statusMap[status as keyof typeof statusMap] || statusMap.available;
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR'
-    }).format(amount);
+  const getCategoryColor = (category: string) => {
+    const colorMap = {
+      'hostel': 'bg-blue-100 text-blue-800',
+      'mess': 'bg-green-100 text-green-800',
+      'academic': 'bg-purple-100 text-purple-800',
+      'administrative': 'bg-gray-100 text-gray-800'
+    };
+    return colorMap[category as keyof typeof colorMap] || 'bg-gray-100 text-gray-800';
   };
 
   const formatDate = (dateString: string) => {
@@ -112,22 +203,38 @@ export function StudentPaymentsPage() {
     });
   };
 
+  const handleDownload = (documentId: string) => {
+    // Mock download functionality
+    console.log(`Downloading document ${documentId}`);
+    // In real implementation, this would trigger actual file download
+  };
+
+  const handleUpload = () => {
+    // Mock upload functionality
+    console.log('Opening file upload dialog');
+    // In real implementation, this would open file upload dialog
+  };
+
   // Navigation items for students
   const navigationItems = [
     { name: 'Dashboard', icon: Home, href: '/student', current: false },
     { name: 'My Profile', icon: User, href: '/student-profile', current: false },
     { name: 'Room Details', icon: Building2, href: '/student-room', current: false },
-    { name: 'Payments', icon: CreditCard, href: '/student-payments', current: true },
+    { name: 'Payments', icon: CreditCard, href: '/student-payments', current: false },
     { name: 'Attendance', icon: Calendar, href: '/student-attendance', current: false },
     { name: 'Notifications', icon: Bell, href: '/student-notifications', badge: 3, current: false },
-    { name: 'Documents', icon: FileText, href: '/student-documents', current: false },
-    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },
+    { name: 'Documents', icon: FileText, href: '/student-documents', current: true },
+    { name: 'Help & Support', icon: HelpCircle, href: '/student-help', current: false },  
   ];
 
-  console.log('[StudentPaymentsPage] Rendering, payments:', payments);
+  const availableCount = documents.filter(d => d.status === 'available').length;
+  const requiredCount = documents.filter(d => d.is_required).length;
+  const pendingCount = documents.filter(d => d.status === 'pending').length;
 
-  if (!payments.length) {
-    console.log('[StudentPaymentsPage] No payments, showing loading state');
+  console.log('[StudentDocumentsPage] Rendering, documents:', documents);
+
+  if (!documents.length) {
+    console.log('[StudentDocumentsPage] No documents, showing loading state');
     return (
       <div className="min-h-screen bg-background">
         <div className="flex">
@@ -222,7 +329,7 @@ export function StudentPaymentsPage() {
           <div className="flex-1">
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <p className="ml-2">Loading payments...</p>
+              <p className="ml-2">Loading documents...</p>
             </div>
           </div>
         </div>
@@ -230,7 +337,7 @@ export function StudentPaymentsPage() {
     );
   }
 
-  console.log('[StudentPaymentsPage] Rendering main content with payments');
+  console.log('[StudentDocumentsPage] Rendering main content with documents');
 
   return (
     <div className="min-h-screen bg-background">
@@ -328,8 +435,8 @@ export function StudentPaymentsPage() {
           <div className="bg-card border-b border-border px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Payments</h1>
-                <p className="text-muted-foreground">Manage your hostel and mess payments</p>
+                <h1 className="text-2xl font-bold">Documents</h1>
+                <p className="text-muted-foreground">Access hostel forms, menus, policies, and important documents</p>
               </div>
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
@@ -339,13 +446,17 @@ export function StudentPaymentsPage() {
                   <Badge variant="secondary">Student</Badge>
                   <span className="text-sm text-muted-foreground">{user?.email?.split('@')[0] || 'SU'}</span>
                 </div>
+                <Button onClick={handleUpload}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Document
+                </Button>
               </div>
             </div>
           </div>
 
-          {/* Payments Content */}
+          {/* Documents Content */}
           <div className="p-6">
-            {/* Payment Summary */}
+            {/* Document Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card>
                 <CardContent className="p-6">
@@ -354,8 +465,21 @@ export function StudentPaymentsPage() {
                       <CheckCircle className="h-6 w-6 text-green-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Paid</p>
-                      <p className="text-2xl font-bold">{payments.filter(p => p.status === 'paid').length}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Available</p>
+                      <p className="text-2xl font-bold">{availableCount}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-100 rounded-full">
+                      <FileText className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Required</p>
+                      <p className="text-2xl font-bold">{requiredCount}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -368,81 +492,78 @@ export function StudentPaymentsPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Pending</p>
-                      <p className="text-2xl font-bold">{payments.filter(p => p.status === 'pending').length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="p-3 bg-red-100 rounded-full">
-                      <XCircle className="h-6 w-6 text-red-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-                      <p className="text-2xl font-bold">{payments.filter(p => p.status === 'overdue').length}</p>
+                      <p className="text-2xl font-bold">{pendingCount}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Payment History */}
+            {/* Documents List */}
             <Card>
               <CardHeader>
-                <CardTitle>Payment History</CardTitle>
+                <CardTitle>All Documents</CardTitle>
                 <CardDescription>
-                  View all your payment transactions and pending dues
+                  Browse and download hostel-related documents, forms, and resources
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {payments.map((payment) => {
-                    const statusInfo = getStatusBadge(payment.status);
+                  {documents.map((document) => {
+                    const FileIcon = getFileIcon(document.type);
+                    const statusInfo = getStatusBadge(document.status);
                     const StatusIcon = statusInfo.icon;
                     
                     return (
-                      <div key={payment.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div key={document.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                         <div className="flex items-center space-x-4">
                           <div className="p-2 bg-muted rounded-lg">
-                            <StatusIcon className="h-5 w-5" />
+                            <FileIcon className="h-5 w-5" />
                           </div>
-                          <div>
-                            <h4 className="font-medium">{payment.description}</h4>
-                            <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                              <span>Due: {formatDate(payment.due_date)}</span>
-                              {payment.paid_date && (
-                                <span>Paid: {formatDate(payment.paid_date)}</span>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="font-medium">{document.name}</h4>
+                              {document.is_required && (
+                                <Badge variant="outline" className="text-red-600 border-red-200">
+                                  Required
+                                </Badge>
                               )}
-                              {payment.payment_method && (
-                                <span>Method: {payment.payment_method}</span>
-                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{document.description}</p>
+                            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+                              <span>Updated: {formatDate(document.last_updated)}</span>
+                              <span>Size: {document.file_size}</span>
+                              <span>Downloads: {document.download_count}</span>
+                              <Badge className={getCategoryColor(document.category)}>
+                                {document.category}
+                              </Badge>
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4">
                           <div className="text-right">
-                            <p className="text-lg font-bold">{formatCurrency(payment.amount)}</p>
-                            <Badge variant={statusInfo.variant} className="mt-1">
+                            <Badge variant={statusInfo.variant} className="mb-2">
+                              <StatusIcon className="h-3 w-3 mr-1" />
                               {statusInfo.text}
                             </Badge>
+                            {document.expires_at && (
+                              <p className="text-xs text-muted-foreground">
+                                Expires: {formatDate(document.expires_at)}
+                              </p>
+                            )}
                           </div>
                           <div className="flex space-x-2">
                             <Button variant="outline" size="sm">
                               <Eye className="h-4 w-4 mr-2" />
-                              View
+                              Preview
                             </Button>
-                            {payment.status !== 'paid' && (
-                              <Button size="sm">
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                Pay Now
-                              </Button>
-                            )}
-                            {payment.status === 'paid' && (
-                              <Button variant="outline" size="sm">
+                            {document.status === 'available' && (
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleDownload(document.id)}
+                              >
                                 <Download className="h-4 w-4 mr-2" />
-                                Receipt
+                                Download
                               </Button>
                             )}
                           </div>
