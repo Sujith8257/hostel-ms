@@ -1,23 +1,41 @@
-/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '@/types';
 import type { DbProfile } from '@/types/database-models';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 
+// const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// async function myProcess() {
+//   console.log("Starting the process...");
+//   await sleep(15000); // Pauses the function here for 15 seconds
+//   console.log("Process resumed after 15 seconds.");
+// }
+// myProcess();
+
 interface AuthContextType {
   user: User | null;
   profile: DbProfile | null;
   session: Session | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signup: (email: string, password: string, fullName: string, role?: UserRole, phone?: string, organization?: string, justification?: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
+  // logout: () => Promise<void>;
   refreshToken: () => Promise<{ success: boolean; error?: string }>;
   isLoading: boolean;
 }
 
 // Narrow type for login response to avoid any
-// Note: Keep types minimal and only what we use to avoid unused declarations errors
+interface BackendLoginResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    user?: { id: string; email?: string };
+    profile?: Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
+    session?: { access_token: string; refresh_token: string };
+  };
+}
+
+type MinimalProfile = Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -29,59 +47,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fallback timeout to prevent infinite loading
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (isLoading) {
-        console.warn('[Auth] Loading timeout reached, setting isLoading to false');
-        setLoading(false, 'timeout-fallback');
-      }
-    }, 10000); // 10 second timeout
-
-    return () => clearTimeout(timeout);
-  }, [isLoading]);
-
-  // Small helper to keep track of loading toggles
-  const setLoading = (value: boolean, reason: string) => {
-    console.info('[Auth] setLoading', { value, reason });
-    setIsLoading(value);
-  };
-
-  // Force navigation to home page with fallbacks to avoid any SPA/router interference
-  const HOME_PATH = import.meta.env.BASE_URL || '/';
-  const hardRedirectHome = () => {
-    try {
-      window.location.replace(HOME_PATH);
-    } catch {
-      window.location.href = HOME_PATH;
-    }
-    // If navigation didn’t happen immediately, try again shortly
-    setTimeout(() => {
-      if (window.location.pathname !== HOME_PATH) {
-        try {
-          window.location.assign(HOME_PATH);
-        } catch {
-          window.location.href = HOME_PATH;
-        }
-      }
-    }, 50);
-    // Last resort: add a cache-busting query to ensure reload
-    setTimeout(() => {
-      if (window.location.pathname !== HOME_PATH) {
-        const sep = HOME_PATH.includes('?') ? '&' : '?';
-        window.location.href = `${HOME_PATH}${sep}t=${Date.now()}`;
-      }
-    }, 200);
-  };
-
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log('[AuthProvider] Initial supabase.auth.getSession:', session);
       setSession(session);
       if (session?.user) {
+        console.log('[AuthProvider] Session user found after reload:', session.user);
         await fetchUserProfile(session.user.id);
       } else {
-        setLoading(false, 'initial: no session');
+        console.log('[AuthProvider] No session user found after reload.');
+        setIsLoading(false);
       }
     });
 
@@ -90,14 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('[Auth] State change:', event, { hasSession: !!session, hasUser: !!session?.user });
-      
       setSession(session);
       if (session?.user) {
+        console.log('[AuthProvider] Auth state change: session user found:', session.user);
         await fetchUserProfile(session.user.id);
       } else {
+        console.log('[AuthProvider] Auth state change: no session user. Clearing context.');
         setUser(null);
         setProfile(null);
-        setLoading(false, 'auth-change: no session');
+        setIsLoading(false);
       }
     });
 
@@ -106,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      console.info('[Auth] Fetching user profile for userId:', userId);
       // Use ordering + limit instead of .single() to avoid failure when duplicates exist temporarily
       const { data, error } = await supabase
         .from('profiles')
@@ -117,14 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('[Auth] Error fetching profile:', error);
-        setLoading(false, 'fetchUserProfile:error');
         return;
       }
 
       const profileData = Array.isArray(data) ? data[0] : data;
       if (!profileData) {
         console.warn('[Auth] No profile found for user', userId);
-        setLoading(false, 'fetchUserProfile:no-profile');
         return;
       }
       setProfile(profileData as DbProfile);
@@ -136,94 +110,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: profileData.role as 'admin' | 'warden' | 'student',
         createdAt: new Date(profileData.created_at),
       };
-      setUser(userData);
-      console.info('[Auth] User profile fetched and set', { user: userData });
+        setUser(userData);
+        console.log('[Auth] setUser called with:', userData);
     } catch (err) {
       console.error('[Auth] Exception in fetchUserProfile:', err);
     } finally {
-      setLoading(false, 'fetchUserProfile:finally');
+      setIsLoading(false);
     }
   };
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; role?: string }> => {
-    try {
-      setLoading(true, 'login:start');
-      console.log('[Auth] Attempting login for', email);
+const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    setIsLoading(true);
+    console.log('[Auth] Step 1: Starting login for', email);
 
-      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const result = await response.json();
-      console.info('[Auth] Backend login response:', { 
-        success: result.success, 
-        hasData: !!result.data, 
-        hasProfile: !!result.data?.profile,
-        hasUser: !!result.data?.user,
-        profileRole: result.data?.profile?.role,
-        userRole: result.data?.user?.role
-      });
-      
-      if (!result.success) {
-        setLoading(false, 'login:backend result.success=false');
-        return { success: false, error: result.error || 'Login failed' };
-      }
-      const sessionPayload = result.data?.session;
-      if (!sessionPayload?.access_token) {
-        setLoading(false, 'login:invalid session payload');
-        return { success: false, error: 'Invalid session data received' };
-      }
-      // Set Supabase session
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: sessionPayload.access_token,
-        refresh_token: sessionPayload.refresh_token,
-      });
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    console.log('[Auth] Step 2: Login response received', response);
+    
+    const result = await response.json();
+    console.log('[Auth] Step 3: Parsed response JSON', result);
 
-      if (sessionError) {
-        console.error('[Auth] Session set error', sessionError);
-        setLoading(false, 'login:setSession error');
-        return { success: false, error: sessionError.message };
-      }
-
-      // Immediately reflect session in context to avoid navigation races
-      try {
-        const { data: { session: newSession } } = await supabase.auth.getSession();
-        setSession(newSession);
-        console.info('[Auth] Session set in context after login', { hasSession: !!newSession, hasUser: !!newSession?.user });
-      } catch (getSessionErr) {
-        console.warn('[Auth] Could not retrieve session after login (continuing)', getSessionErr);
-      }
-
-      // Set user/profile from backend response
-      let userRole: string | undefined;
-      if (result.data?.profile) {
-        setProfile(result.data.profile as DbProfile);
-        const profileData = result.data.profile;
-        userRole = profileData.role;
-        const userData: User = {
-          id: profileData.id,
-          name: profileData.full_name,
-          email: profileData.email,
-          role: profileData.role as 'admin' | 'warden' | 'student',
-          createdAt: new Date(profileData.created_at),
-        };
-        setUser(userData);
-        console.info('[Auth] User set from profile data', { user: userData, role: userRole });
-      } else if (result.data?.user?.id) {
-        console.info('[Auth] Fetching user profile from user ID');
-        await fetchUserProfile(result.data.user.id);
-      }
-      setLoading(false, 'login:success');
-      console.info('[Auth] Login completed, returning success', { role: userRole });
-      // Do not hard-redirect here; let the LoginPage handle role-based navigation
-      return { success: true, role: userRole };
-    } catch (err) {
-      console.error('[Auth] Login error:', err);
-      setLoading(false, 'login:exception');
-      return { success: false, error: 'Network error. Please check your connection.' };
+    if (!result.success) {
+      console.warn('[Auth] Step 4: Login failed', result.error);
+      setIsLoading(false);
+      return { success: false, error: result.error || 'Login failed' };
     }
-  };
+
+    const sessionPayload = result.data?.session;
+    console.log('[Auth] Step 5: Session payload', sessionPayload);
+
+    if (!sessionPayload?.access_token) {
+      console.error('[Auth] Step 6: Invalid session data', sessionPayload);
+      setIsLoading(false);
+      return { success: false, error: 'Invalid session data received' };
+    }
+ 
+//     await supabase.auth.setSession({
+//   access_token: sessionPayload.access_token,
+//   refresh_token: sessionPayload.refresh_token,
+// });
+    // // Set Supabase session
+    //   let sessionError;
+    //   try {
+    //     const timeout = setTimeout(() => {
+    //       console.warn('[Auth] Step 6b: setSession is taking too long...');
+    //     }, 5000);
+    //     const result = await supabase.auth.setSession({
+    //       access_token: sessionPayload.access_token,
+    //       refresh_token: sessionPayload.refresh_token,
+    //     });
+    //     clearTimeout(timeout);
+    //     sessionError = result.error;
+    //     console.log('[Auth] Step 7: Supabase setSession result', sessionError);
+    //   } catch (err) {
+    //     console.error('[Auth] Step 7a: setSession threw error', err);
+    //     setIsLoading(false);
+    //     return { success: false, error: 'setSession threw: ' + err };
+    //   }
+
+    //   if (sessionError) {
+    //     console.error('[Auth] Step 8: Session set error', sessionError);
+    //     setIsLoading(false);
+    //     return { success: false, error: sessionError.message };
+    //   }
+
+    // Set user/profile from backend response
+    if (result.data?.profile) {
+      setProfile(result.data.profile as DbProfile);
+      const profileData = result.data.profile;
+      const userData: User = {
+        id: profileData.id,
+        name: profileData.full_name,
+        email: profileData.email,
+        role: profileData.role as 'admin' | 'warden' | 'student',
+        createdAt: new Date(profileData.created_at),
+      };
+      alert(result.data.user.id);
+      setUser(userData);
+      alert(userData.name);
+      console.log('[Auth] Step 8: Set user', userData);
+      console.log('[Auth] Step 9: Set user and profile', userData, profileData);
+    } else if (result.data?.user?.id) {
+      console.log('[Auth] Step 10: Fetching user profile for', result.data.user.id);
+      await fetchUserProfile(result.data.user.id);
+    }
+await supabase.auth.setSession({
+  access_token: sessionPayload.access_token,
+  refresh_token: sessionPayload.refresh_token,
+});
+  window.location.href = '/dashboard';
+
+    // Do not handle navigation here. Let the caller (component) handle navigation after login.
+    setIsLoading(false);
+    return { success: true };
+  } catch (err) {
+    console.error('[Auth] Step 12: Login error (catch block)', err);
+    setIsLoading(false);
+    return { success: false, error: 'Network error. Please check your connection.' };
+  }
+};
+    
 
   const signup = async (
     email: string, 
@@ -235,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     justification?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      setLoading(true, 'signup:start');
+      setIsLoading(true);
       
       // Use backend API for signup
       const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
@@ -265,10 +255,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Signup error:', err);
       return { success: false, error: 'An unexpected error occurred' };
     } finally {
-      setLoading(false, 'signup:finally');
+      setIsLoading(false);
     }
   };
-
   const refreshToken = async (): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -308,122 +297,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async (): Promise<void> => {
-    console.info('[Auth] Logout: start');
-    try {
-      // Do not set global isLoading to avoid ProtectedRoute spinner loops; rely on local UI state
-      // Call backend logout first if we have a session
-      const token = session?.access_token;
-      if (token) {
-        try {
-          console.info('[Auth] Logout: calling backend /logout');
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 2000);
-          try {
-            await fetch(`${API_BASE_URL}/api/auth/logout`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-              signal: controller.signal,
-            });
-          } finally {
-            clearTimeout(timer);
-          }
-        } catch (backendError) {
-          console.warn('[Auth] Logout: backend logout error (continuing)', backendError);
-        }
-      } else {
-        console.info('[Auth] Logout: no access token present, skipping backend call');
-      }
-
-      // Clear Supabase session
-      try {
-        console.info('[Auth] Logout: supabase.auth.signOut()');
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          console.warn('[Auth] Logout: Supabase signOut error (continuing)', error);
-        }
-      } catch (supabaseError) {
-        console.warn('[Auth] Logout: Supabase signOut threw (continuing)', supabaseError);
-      }
-
-      // Always clear local state regardless of API errors
-      setUser(null);
-      setProfile(null);
-      setSession(null);
-      console.info('[Auth] Logout: cleared context state');
-
-      // Best-effort: clear all accessible cookies for this site (cannot clear HttpOnly cookies)
-      try {
-        const cookies = document.cookie ? document.cookie.split('; ') : [];
-        const host = window.location.hostname;
-        const parts = host.split('.');
-        const domainVariants = new Set<string>();
-        for (let i = 0; i < parts.length; i++) {
-          const d = parts.slice(i).join('.');
-          if (d) {
-            domainVariants.add(d);
-            domainVariants.add('.' + d);
-          }
-        }
-        const segments = window.location.pathname.split('/').filter(Boolean);
-        const pathVariants = new Set<string>(['/']);
-        for (let i = 0; i < segments.length; i++) {
-          pathVariants.add('/' + segments.slice(0, i + 1).join('/'));
-        }
-        cookies.forEach((cookie) => {
-          const eqPos = cookie.indexOf('=');
-          const name = eqPos > -1 ? cookie.slice(0, eqPos) : cookie;
-          // Basic delete
-          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-          // Try domain/path combinations
-          domainVariants.forEach((domain) => {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${domain}; path=/`;
-            pathVariants.forEach((path) => {
-              document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain=${domain}; path=${path}`;
-            });
-          });
-          // Try path-only variants without domain
-          pathVariants.forEach((path) => {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${path}`;
-          });
-        });
-        console.info(`[Auth] Logout: attempted to clear ${cookies.length} cookie name(s)`);
-      } catch (cookieErr) {
-        console.warn('[Auth] Logout: cookie clearing failed (continuing)', cookieErr);
-      }
-
-      // Best-effort: clear localStorage auth keys (may vary by Supabase config)
-      try { localStorage.removeItem('mock_user'); } catch { /* ignore */ }
-      try { localStorage.removeItem('supabase.auth.token'); } catch { /* ignore */ }
-      try {
-        const toRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (!k) continue;
-          if ((k.startsWith('sb-') && k.includes('auth-token')) || k.startsWith('supabase.')) {
-            toRemove.push(k);
-          }
-        }
-        toRemove.forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
-      } catch { /* ignore */ }
-
-      // Force hard navigation to landing page to avoid router race conditions
-      console.info('[Auth] Logout: redirecting to home');
-      hardRedirectHome();
-    } catch (err) {
-      console.error('[Auth] Logout: unexpected error (continuing to redirect)', err);
-      setUser(null);
-      setProfile(null);
-      setSession(null);
-      hardRedirectHome();
-    }
-  };
+;
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, refreshToken, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, session, login, signup, refreshToken, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
@@ -434,7 +311,11 @@ export function useAuth() {
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+  // Alert the value of user.name for debugging
+  if (context.user) {
+    // alert('AuthContext user.name: ' + context.user.name);  
+  } else {
+    // alert('AuthContext user is null');
+  }
   return context;
 }
-
-export const useAuthContext = useAuth;

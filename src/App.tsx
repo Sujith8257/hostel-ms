@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { PlaceholderPage } from '@/components/PlaceholderPage';
@@ -7,12 +7,12 @@ import { HelpPage } from '@/pages/HelpPage';
 import { SecurityMonitoringPage } from '@/pages/SecurityMonitoringPage';
 import { VisitorManagementPage } from '@/pages/VisitorManagementPage';
 import { StudentDashboard } from '@/pages/StudentDashboard';
+import { WardenDashboard } from '@/pages/WardenDashboard';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { AboutUsPage } from '@/pages/AboutUsPage';
 // Hostel Management Pages
-import { DashboardPage } from '@/pages/DashboardPage';
 import { AdminDashboard } from '@/pages/AdminDashboard';
 import { AlertsPage } from '@/pages/AlertsPage';
 import { RoomManagementPage } from '@/pages/RoomManagementPage';
@@ -46,11 +46,14 @@ function AppContent() {
         } />
         <Route path="/about" element={<AboutUsPage />} />
         
-        {/* Public Routes - No Authentication Required */}
+        {/* Role-based Dashboard Routes */}
         <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/dashboard" element={<StudentDashboard />} />
+        <Route path="/student" element={<StudentDashboard />} />
+        <Route path="/warden" element={<WardenDashboard />} />
+        
+        
+        {/* Management Pages */}
         <Route path="/students" element={<StudentsPage />} />
-        <Route path="/student-dashboard" element={<StudentDashboard />} />
         <Route path="/entries" element={<EntryExitLogsPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/rooms" element={<RoomManagementPage />} />

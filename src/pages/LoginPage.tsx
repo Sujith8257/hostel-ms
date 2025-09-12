@@ -19,24 +19,44 @@ export function LoginPage() {
   const location = useLocation();
   type FromState = { from?: { pathname?: string } } | null;
   const locState = (location.state ?? null) as FromState;
-  const rawFromPath = locState?.from?.pathname || '/dashboard';
-  const fromPath = rawFromPath?.startsWith('/login') ? '/dashboard' : rawFromPath;
+  const rawFromPath = locState?.from?.pathname || '/student';
+  const fromPath = rawFromPath?.startsWith('/login') ? '/student' : rawFromPath;
 
   // Redirect if already logged in
   useEffect(() => {
     if (user || session) {
-      const isAdmin = user?.role === 'admin';
-      const isStudent = user?.role === 'student';
-      let dest = fromPath || '/dashboard';
+      const normalizedRole = user?.role?.toLowerCase();
+      const isAdmin = normalizedRole === 'admin';
+      const isStudent = normalizedRole === 'student';
+      const isWarden = normalizedRole === 'warden';
+      let dest = fromPath || '/student';
       
       if (isAdmin) {
         dest = '/admin';
       } else if (isStudent) {
-        dest = '/dashboard';
+        dest = '/student';
+      } else if (isWarden) {
+        dest = '/warden';
+      } else {
+        // Fallback for unknown roles
+        console.warn('[LoginPage] Unknown role detected in useEffect, using default destination', { 
+          role: user?.role, 
+          normalizedRole 
+        });
+        dest = '/student';
       }
       
       if (location.pathname !== dest) {
-        console.info('[LoginPage] Detected auth (user or session), navigating', { to: dest, role: user?.role, hasUser: !!user, hasSession: !!session });
+        console.info('[LoginPage] Detected auth (user or session), navigating', { 
+        to: dest, 
+        role: user?.role, 
+        normalizedRole,
+        isAdmin, 
+        isStudent, 
+        isWarden,
+        hasUser: !!user, 
+        hasSession: !!session 
+      });
         try {
           navigate(dest, { replace: true });
         } catch {
@@ -51,25 +71,81 @@ export function LoginPage() {
     setError('');
     
     const result = await login(email, password);
-    console.info('[LoginPage] Login attempt finished', { success: result.success, error: result.error, role: result.role });
+    console.info('[LoginPage] Login attempt finished', { 
+      success: result.success, 
+      error: result.error, 
+      role: result.role,
+      resultObject: result,
+      resultKeys: Object.keys(result || {}),
+      resultType: typeof result
+    });
     if (result.success) {
-      // Use role directly from login response
-      const isAdmin = result.role === 'admin';
-      const isStudent = result.role === 'student';
-      let destination = fromPath;
+      // Use role directly from login response (case-insensitive)
+      // Also check user object from context as fallback
+      const roleFromResult = result.role?.toLowerCase();
+      const roleFromUser = user?.role?.toLowerCase();
+      const normalizedRole = roleFromResult || roleFromUser;
+      
+      console.info('[LoginPage] Role detection', {
+        roleFromResult,
+        roleFromUser,
+        normalizedRole,
+        hasResultRole: !!result.role,
+        hasUserRole: !!user?.role,
+        resultRole: result.role,
+        userRole: user?.role,
+        resultKeys: Object.keys(result || {}),
+        userKeys: Object.keys(user || {}),
+        fullResult: result
+      });
+
+      // If we still don't have a role, let's check what we actually got
+      if (!normalizedRole) {
+        console.error('[LoginPage] No role found in result or user object!', {
+          result,
+          user,
+          session
+        });
+      }
+      
+      const isAdmin = normalizedRole === 'admin';
+      const isStudent = normalizedRole === 'student';
+      const isWarden = normalizedRole === 'warden';
+      let destination = fromPath || '/student';
       
       if (isAdmin) {
         destination = '/admin';
       } else if (isStudent) {
-        destination = '/student-dashboard';
+        destination = '/student';
+      } else if (isWarden) {
+        destination = '/warden';
+      } else {
+        // Fallback for unknown roles
+        console.warn('[LoginPage] Unknown role detected, using default destination', { 
+          roleFromResult,
+          roleFromUser,
+          normalizedRole 
+        });
+        destination = '/student';
       }
       
-      console.info('[LoginPage] Login success, redirecting', { to: destination, role: result.role });
-      try {
-        navigate(destination, { replace: true });
-      } catch {
-        window.location.replace(destination);
-      }
+      console.info('[LoginPage] Login success, redirecting', { 
+        to: destination, 
+        role: result.role, 
+        normalizedRole,
+        isAdmin, 
+        isStudent, 
+        isWarden 
+      });
+      
+      // Small delay to ensure user object is set in context
+      setTimeout(() => {
+        try {
+          navigate(destination, { replace: true });
+        } catch {
+          window.location.replace(destination);
+        }
+      }, 100);
     } else {
       setError(result.error || 'Invalid email or password');
     }
@@ -79,28 +155,28 @@ export function LoginPage() {
     { 
       email: '99220041542@klu.ac.in', 
       password: 'klu123456', 
-      role: 'Administrator', 
+      role: 'admin', 
       variant: 'destructive' as const,
       name: 'Admin User 41542'
     },
     { 
       email: '99220041552@klu.ac.in', 
       password: 'klu123456', 
-      role: 'Warden', 
+      role: 'warden', 
       variant: 'default' as const,
       name: 'Warden User 41552'
     },
     { 
       email: '99220041565@klu.ac.in', 
       password: 'klu123456', 
-      role: 'Warden', 
+      role: 'warden', 
       variant: 'default' as const,
       name: 'Warden User 41565'
     },
     { 
       email: '99220041512@klu.ac.in', 
       password: 'klu123456', 
-      role: 'Student', 
+      role: 'student', 
       variant: 'outline' as const,
       name: 'Student User 41512'
     },
