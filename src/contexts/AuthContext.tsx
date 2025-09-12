@@ -318,19 +318,16 @@ const login = async (email: string, password: string): Promise<{ success: boolea
       setSession(null);
       console.info('[Auth] Logout: cleared context state');
 
-      // Force hard navigation to landing page
-      console.info('[Auth] Logout: redirecting to home');
-      window.location.href = '/';
+      // Note: Let the calling component handle navigation
+      console.info('[Auth] Logout: completed, user state cleared');
     } catch (err) {
       console.error('[Auth] Logout: unexpected error (continuing to redirect)', err);
       setUser(null);
       setProfile(null);
       setSession(null);
-      window.location.href = '/';
+      // Note: Let the calling component handle navigation
     }
   };
-
-;
 
   return (
     <AuthContext.Provider value={{ user, profile, session, login, signup, logout, refreshToken, isLoading }}>

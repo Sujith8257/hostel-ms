@@ -94,7 +94,7 @@ export function StudentDashboard() {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate('/');
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -296,9 +296,9 @@ export function StudentDashboard() {
                 Quick Actions
               </h3>
               <div className="space-y-2">
-                <Button variant="outline" size="sm" className="w-full justify-start">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download ID Card
+              <Button variant="outline" size="sm" className="w-full justify-start">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Download Mess Menu
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start">
                   <FileText className="h-4 w-4 mr-2" />
@@ -319,7 +319,7 @@ export function StudentDashboard() {
                 </div>
                 <div>
                   <p className="text-sm font-medium">{profile?.name || 'Student'}</p>
-                  <p className="text-xs text-muted-foreground">{profile?.register_number || 'REG001'}</p>
+                  <p className="text-xs text-muted-foreground">{profile?.email?.split('@')[0] || 'SU'}</p>
                 </div>
               </div>
               <Button

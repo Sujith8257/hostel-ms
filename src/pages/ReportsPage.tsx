@@ -27,8 +27,15 @@ export function ReportsPage() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/');
+    console.log('[ReportsPage] Logout button clicked');
+    try {
+      await logout();
+      console.log('[ReportsPage] Logout successful, navigating to landing page');
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('[ReportsPage] Logout failed:', error);
+      navigate('/', { replace: true });
+    }
   };
 
   // Navigation items (same as AdminDashboard)

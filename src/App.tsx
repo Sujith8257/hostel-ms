@@ -7,6 +7,7 @@ import { HelpPage } from '@/pages/HelpPage';
 import { SecurityMonitoringPage } from '@/pages/SecurityMonitoringPage';
 import { VisitorManagementPage } from '@/pages/VisitorManagementPage';
 import { StudentDashboard } from '@/pages/StudentDashboard';
+import { StudentProfilePage } from '@/pages/StudentProfilePage';
 import { WardenDashboard } from '@/pages/WardenDashboard';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -49,6 +50,7 @@ function AppContent() {
         {/* Role-based Dashboard Routes */}
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/student" element={<StudentDashboard />} />
+        <Route path="/student-profile" element={<StudentProfilePage />} />
         <Route path="/warden" element={<WardenDashboard />} />
         
         

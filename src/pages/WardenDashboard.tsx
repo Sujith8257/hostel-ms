@@ -131,7 +131,12 @@ export function WardenDashboard() {
             </div>
             <div className="text-right">
               <p className="text-sm text-blue-200">Hostel Management System</p>
-              <p className="text-lg font-semibold">Warden</p>
+              <div className="flex items-center space-x-2">
+                <Badge variant="secondary" className="bg-blue-500/20 text-blue-100 border-blue-400/30">
+                  Warden
+                </Badge>
+                <span className="text-sm text-blue-200">{user?.email?.split('@')[0] || 'WU'}</span>
+              </div>
             </div>
           </div>
         </motion.div>
