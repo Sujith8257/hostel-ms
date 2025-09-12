@@ -189,20 +189,33 @@ const login = async (email: string, password: string): Promise<{ success: boolea
         role: profileData.role as 'admin' | 'warden' | 'student',
         createdAt: new Date(profileData.created_at),
       };
-      alert(result.data.user.id);
       setUser(userData);
-      alert(userData.name);
       console.log('[Auth] Step 8: Set user', userData);
       console.log('[Auth] Step 9: Set user and profile', userData, profileData);
     } else if (result.data?.user?.id) {
       console.log('[Auth] Step 10: Fetching user profile for', result.data.user.id);
       await fetchUserProfile(result.data.user.id);
     }
-await supabase.auth.setSession({
-  access_token: sessionPayload.access_token,
-  refresh_token: sessionPayload.refresh_token,
-});
-  window.location.href = '/dashboard';
+ await supabase.auth.setSession({
+   access_token: sessionPayload.access_token,
+   refresh_token: sessionPayload.refresh_token,
+ });
+ 
+ // Determine redirect based on user role
+ let redirectPath = '/student'; // default
+ if (result.data?.profile?.role) {
+   const role = result.data.profile.role.toLowerCase();
+   if (role === 'admin') {
+     redirectPath = '/admin';
+   } else if (role === 'warden') {
+     redirectPath = '/warden';
+   } else if (role === 'student') {
+     redirectPath = '/student';
+   }
+ }
+ 
+ console.log('[Auth] Redirecting to:', redirectPath, 'for role:', result.data?.profile?.role);
+ window.location.href = redirectPath;
 
     // Do not handle navigation here. Let the caller (component) handle navigation after login.
     setIsLoading(false);
@@ -310,12 +323,6 @@ export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
-  }
-  // Alert the value of user.name for debugging
-  if (context.user) {
-    // alert('AuthContext user.name: ' + context.user.name);  
-  } else {
-    // alert('AuthContext user is null');
   }
   return context;
 }
