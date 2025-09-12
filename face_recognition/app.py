@@ -81,9 +81,8 @@ def get_all_students(limit: int = 2000) -> List[Dict]:
 def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full_name: str = None) -> bool:
     """Save face embedding to Supabase students table"""
     try:
-        # Convert embedding to base64 string for JSON transport to bytea column
-        embedding_bytes = embedding.astype(np.float32).tobytes()
-        embedding_b64 = base64.b64encode(embedding_bytes).decode('utf-8')
+        # Convert embedding to list for JSONB storage
+        embedding_list = embedding.astype(np.float32).tolist()
         
         # Check if student already exists
         existing_student = supabase.table('students').select('*').eq('register_number', register_number).execute()
@@ -91,7 +90,7 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
         if existing_student.data:
             # Update existing student with face embedding
             result = supabase.table('students').update({
-                'face_embedding': embedding_b64,
+                'face_embedding': embedding_list,
                 'updated_at': datetime.now().isoformat()
             }).eq('register_number', register_number).execute()
             
@@ -109,7 +108,7 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
             result = supabase.table('students').insert({
                 'register_number': register_number,
                 'full_name': full_name or f"Student {register_number}",
-                'face_embedding': embedding_b64,
+                'face_embedding': embedding_list,
                 'hostel_status': 'resident',
                 'is_active': True
             }).execute()
@@ -134,31 +133,34 @@ def get_embedding_from_supabase(register_number: str) -> Optional[np.ndarray]:
         result = supabase.table('students').select('face_embedding').eq('register_number', register_number).eq('is_active', True).execute()
         
         if result.data and result.data[0]['face_embedding']:
-            # For bytea column, we get raw bytes directly
+            # For JSONB column, we get a list directly
             embedding_data = result.data[0]['face_embedding']
             
-            if isinstance(embedding_data, bytes):
-                # Direct bytes from bytea column
-                embedding = np.frombuffer(embedding_data, dtype=np.float32)
+            if isinstance(embedding_data, list):
+                # Convert list to numpy array (JSONB format)
+                embedding = np.array(embedding_data, dtype=np.float32)
             elif isinstance(embedding_data, str):
-                # Base64 string - use robust decoding
+                # Handle legacy base64 encoded strings (for backward compatibility)
                 embedding_bytes = decode_base64_embedding(embedding_data)
                 if embedding_bytes is None:
-                    print(f"Failed to decode base64 embedding for student {register_number}")
+                    print(f"Failed to decode legacy embedding for {register_number}")
                     return None
                 
                 try:
                     embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
                 except ValueError as e:
-                    print(f"Failed to convert bytes to numpy array for student {register_number}: {e}")
+                    print(f"Failed to convert legacy bytes to array for {register_number}: {e}")
                     return None
+            elif isinstance(embedding_data, bytes):
+                # Handle legacy bytea format (for backward compatibility)
+                embedding = np.frombuffer(embedding_data, dtype=np.float32)
             else:
-                print(f"Invalid face embedding data type for student {register_number}: {type(embedding_data)}")
+                print(f"Unexpected embedding data type for {register_number}: {type(embedding_data)}")
                 return None
             
             # Validate embedding size
             if len(embedding) != 512:
-                print(f"Invalid embedding size for student {register_number}: {len(embedding)}")
+                print(f"Invalid embedding size for {register_number}: {len(embedding)} (expected 512)")
                 return None
                 
             return embedding
@@ -1380,32 +1382,32 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 if not face_embedding_data:
                     continue
                 
-                # Validate and decode base64 string
+                # Handle JSONB list format (current) and legacy formats
                 try:
-                    # Check if it's a valid base64 string
-                    if isinstance(face_embedding_data, str):
-                        # Use robust base64 decoding
+                    if isinstance(face_embedding_data, list):
+                        # JSONB list format (current)
+                        stored_embedding = np.array(face_embedding_data, dtype=np.float32)
+                    elif isinstance(face_embedding_data, str):
+                        # Legacy base64 encoded data
                         stored_embedding_bytes = decode_base64_embedding(face_embedding_data)
                         if stored_embedding_bytes is None:
                             print(f"Failed to decode base64 embedding for student {student.get('register_number', 'unknown')}")
                             continue
-                    else:
-                        # If it's already bytes, use directly
-                        stored_embedding_bytes = face_embedding_data
-                    
-                    try:
                         stored_embedding = np.frombuffer(stored_embedding_bytes, dtype=np.float32)
-                        
-                        # Validate embedding size (should be 512 for MobileFaceNet)
-                        if len(stored_embedding) != 512:
-                            print(f"Invalid embedding size for student {student.get('register_number', 'unknown')}: {len(stored_embedding)}")
-                            continue
-                    except ValueError as e:
-                        print(f"Failed to convert bytes to numpy array for student {student.get('register_number', 'unknown')}: {e}")
+                    elif isinstance(face_embedding_data, bytes):
+                        # Legacy raw bytes data
+                        stored_embedding = np.frombuffer(face_embedding_data, dtype=np.float32)
+                    else:
+                        print(f"Unknown embedding data type for student {student.get('register_number', 'unknown')}: {type(face_embedding_data)}")
+                        continue
+                    
+                    # Validate embedding size (should be 512 for MobileFaceNet)
+                    if len(stored_embedding) != 512:
+                        print(f"Invalid embedding size for student {student.get('register_number', 'unknown')}: {len(stored_embedding)}")
                         continue
                         
                 except Exception as decode_error:
-                    print(f"Invalid base64 encoding for student {student.get('register_number', 'unknown')}: {decode_error}")
+                    print(f"Failed to process embedding for student {student.get('register_number', 'unknown')}: {decode_error}")
                     continue
                 
                 # Calculate similarity
@@ -1483,52 +1485,83 @@ async def cleanup_invalid_embeddings():
         for student in students:
             if student.get('face_embedding'):
                 total_count += 1
-                face_embedding_data = student['face_embedding']
-                register_number = student.get('register_number', 'unknown')
+                register_number = student['register_number']
                 
-                try:
-                    # Validate base64 encoding
-                    if isinstance(face_embedding_data, str):
-                        # Use robust decoding to test and potentially fix
-                        test_bytes = decode_base64_embedding(face_embedding_data)
-                        if test_bytes is None:
-                            print(f"Corrupted embedding for student {register_number} - cannot decode")
-                            corrupted_count += 1
+                # Try to decode the embedding
+                embedding_data = student['face_embedding']
+                
+                if isinstance(embedding_data, list):
+                    # JSONB list format (current)
+                    try:
+                        embedding = np.array(embedding_data, dtype=np.float32)
+                        if len(embedding) != 512:
+                            print(f"Invalid embedding size for {register_number}: {len(embedding)}")
+                            invalid_count += 1
                             continue
-                            
-                        try:
-                            test_embedding = np.frombuffer(test_bytes, dtype=np.float32)
-                            
-                            if len(test_embedding) == 512:
-                                # Re-encode properly and update database
-                                clean_b64 = base64.b64encode(test_bytes).decode('utf-8')
-                                
-                                # Update in database with clean base64
-                                supabase.table('students').update({
-                                    'face_embedding': clean_b64
-                                }).eq('register_number', register_number).execute()
-                                fixed_count += 1
-                                print(f"Fixed encoding for student {register_number}")
-                            else:
-                                invalid_count += 1
-                                print(f"Invalid embedding size for student {register_number}: {len(test_embedding)}")
-                        except ValueError as e:
-                            invalid_count += 1
-                            print(f"Failed to decode embedding for student {register_number}: {e}")
-                    else:
-                        # Data is already bytes, validate size
-                        try:
-                            test_embedding = np.frombuffer(face_embedding_data, dtype=np.float32)
-                            if len(test_embedding) != 512:
-                                invalid_count += 1
-                                print(f"Invalid embedding size for student {register_number}: {len(test_embedding)}")
-                        except ValueError as e:
-                            invalid_count += 1
-                            print(f"Invalid bytes data for student {register_number}: {e}")
+                    except Exception as e:
+                        print(f"Failed to convert list to array for {register_number}: {e}")
+                        invalid_count += 1
+                        continue
                         
-                except Exception as e:
+                elif isinstance(embedding_data, str):
+                    # Legacy base64 encoded data - convert to JSONB list
+                    embedding_bytes = decode_base64_embedding(embedding_data)
+                    if embedding_bytes is None:
+                        print(f"Invalid base64 embedding for {register_number}")
+                        invalid_count += 1
+                        continue
+                    
+                    try:
+                        embedding = np.frombuffer(embedding_bytes, dtype=np.float32)
+                        if len(embedding) != 512:
+                            print(f"Invalid embedding size for {register_number}: {len(embedding)}")
+                            invalid_count += 1
+                            continue
+                        
+                        # Convert legacy format to JSONB list
+                        embedding_list = embedding.tolist()
+                        supabase.table('students').update({
+                            'face_embedding': embedding_list,
+                            'updated_at': datetime.now().isoformat()
+                        }).eq('register_number', register_number).execute()
+                        fixed_count += 1
+                        print(f"Converted legacy embedding for {register_number} to JSONB format")
+                        
+                    except Exception as e:
+                        print(f"Failed to decode embedding for {register_number}: {e}")
+                        invalid_count += 1
+                        continue
+                        
+                elif isinstance(embedding_data, bytes):
+                    # Legacy raw bytes data - convert to JSONB list
+                    try:
+                        embedding = np.frombuffer(embedding_data, dtype=np.float32)
+                        if len(embedding) != 512:
+                            print(f"Invalid embedding size for {register_number}: {len(embedding)}")
+                            invalid_count += 1
+                            continue
+                        
+                        # Convert legacy format to JSONB list
+                        embedding_list = embedding.tolist()
+                        supabase.table('students').update({
+                            'face_embedding': embedding_list,
+                            'updated_at': datetime.now().isoformat()
+                        }).eq('register_number', register_number).execute()
+                        fixed_count += 1
+                        print(f"Converted legacy embedding for {register_number} to JSONB format")
+                        
+                    except Exception as e:
+                        print(f"Failed to decode raw bytes for {register_number}: {e}")
+                        invalid_count += 1
+                        continue
+                        
+                else:
+                    print(f"Unknown embedding data type for {register_number}: {type(embedding_data)}")
                     invalid_count += 1
-                    print(f"Error processing student {register_number}: {e}")
+                    continue
+                    
+                # If we get here, the embedding is valid
+                print(f"Valid embedding for {register_number}: shape {embedding.shape}")
         
         return {
             "success": True,
@@ -1552,21 +1585,19 @@ async def test_embedding():
         # Create a test embedding
         test_embedding = np.random.rand(512).astype(np.float32)
         
-        # Convert to base64
-        embedding_bytes = test_embedding.tobytes()
-        embedding_b64 = base64.b64encode(embedding_bytes).decode('utf-8')
+        # Convert to JSONB list format
+        embedding_list = test_embedding.tolist()
         
         # Convert back
-        decoded_bytes = base64.b64decode(embedding_b64)
-        decoded_embedding = np.frombuffer(decoded_bytes, dtype=np.float32)
+        decoded_embedding = np.array(embedding_list, dtype=np.float32)
         
         return {
             "success": True,
             "original_shape": test_embedding.shape,
-            "base64_length": len(embedding_b64),
+            "list_length": len(embedding_list),
             "decoded_shape": decoded_embedding.shape,
             "data_integrity": bool(np.allclose(test_embedding, decoded_embedding)),
-            "message": "Embedding conversion test successful"
+            "message": "JSONB embedding conversion test successful"
         }
     except Exception as e:
         return {
