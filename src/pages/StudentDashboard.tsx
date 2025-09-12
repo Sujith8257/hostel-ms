@@ -76,7 +76,7 @@ interface StudentStats {
 }
 
 export function StudentDashboard() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null);

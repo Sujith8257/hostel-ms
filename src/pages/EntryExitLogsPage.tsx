@@ -62,7 +62,7 @@ interface EntryLogStats {
 const FACE_RECOGNITION_API_BASE = 'http://localhost:8005';
 
 export function EntryExitLogsPage() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [logs, setLogs] = useState<EntryLog[]>([]);
@@ -410,7 +410,7 @@ export function EntryExitLogsPage() {
                     <User className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Admin User 41542</p>
+                    <p className="text-sm font-medium">{user?.name || 'Admin User'}</p>
                     <p className="text-xs text-muted-foreground">Administrator</p>
                   </div>
                 </div>
@@ -442,7 +442,7 @@ export function EntryExitLogsPage() {
                       <User className="h-4 w-4" />
                     </div>
                     <Badge variant="secondary">Administrator</Badge>
-                    <span className="text-sm text-muted-foreground">AU4</span>
+                    <span className="text-sm text-muted-foreground">{user?.email?.split('@')[0] || 'AU4'}</span>
                   </div>
                 </div>
               </div>
@@ -551,7 +551,7 @@ export function EntryExitLogsPage() {
                     <User className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Admin User 41542</p>
+                    <p className="text-sm font-medium">{user?.name || 'Admin User'}</p>
                     <p className="text-xs text-muted-foreground">Administrator</p>
                   </div>
                 </div>
@@ -583,7 +583,7 @@ export function EntryExitLogsPage() {
                       <User className="h-4 w-4" />
                     </div>
                     <Badge variant="secondary">Administrator</Badge>
-                    <span className="text-sm text-muted-foreground">AU4</span>
+                    <span className="text-sm text-muted-foreground">{user?.email?.split('@')[0] || 'AU4'}</span>
                   </div>
                 </div>
               </div>

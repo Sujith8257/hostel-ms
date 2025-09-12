@@ -1,20 +1,15 @@
 import { motion } from 'framer-motion';
-import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { 
   Users, 
   Shield, 
   Settings, 
-  Database, 
   Activity, 
   AlertTriangle,
-  CheckCircle,
   TrendingUp,
-  Camera,
   UserCheck,
   Clock,
   Building2,
@@ -26,7 +21,6 @@ import {
   User
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDashboardData, useRecentActivity } from '@/hooks/useDashboardData';
 import { Link, useNavigate } from 'react-router-dom';
 
 export function AdminDashboard() {
@@ -182,7 +176,7 @@ export function AdminDashboard() {
                   <User className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Admin User 41542</p>
+                  <p className="text-sm font-medium">{user?.name || 'Admin User'}</p>
                   <p className="text-xs text-muted-foreground">Administrator</p>
                 </div>
               </div>
@@ -213,7 +207,7 @@ export function AdminDashboard() {
                     <User className="h-4 w-4" />
                   </div>
                   <Badge variant="secondary">Administrator</Badge>
-                  <span className="text-sm text-muted-foreground">AU4</span>
+                  <span className="text-sm text-muted-foreground">{user?.email?.split('@')[0] || 'AU4'}</span>
                 </div>
               </div>
             </div>

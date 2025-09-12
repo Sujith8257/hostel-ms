@@ -17,25 +17,13 @@ interface AuthContextType {
   user: User | null;
   profile: DbProfile | null;
   session: Session | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: string }>;
   signup: (email: string, password: string, fullName: string, role?: UserRole, phone?: string, organization?: string, justification?: string) => Promise<{ success: boolean; error?: string }>;
-  // logout: () => Promise<void>;
+  logout: () => Promise<void>;
   refreshToken: () => Promise<{ success: boolean; error?: string }>;
   isLoading: boolean;
 }
 
-// Narrow type for login response to avoid any
-interface BackendLoginResponse {
-  success: boolean;
-  error?: string;
-  data?: {
-    user?: { id: string; email?: string };
-    profile?: Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
-    session?: { access_token: string; refresh_token: string };
-  };
-}
-
-type MinimalProfile = Partial<DbProfile> & { id?: string; full_name?: string; role?: UserRole; email?: string; created_at?: string };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -119,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; role?: string }> => {
   try {
     setIsLoading(true);
     console.log('[Auth] Step 1: Starting login for', email);
@@ -219,7 +207,7 @@ const login = async (email: string, password: string): Promise<{ success: boolea
 
     // Do not handle navigation here. Let the caller (component) handle navigation after login.
     setIsLoading(false);
-    return { success: true };
+    return { success: true, role: result.data?.profile?.role };
   } catch (err) {
     console.error('[Auth] Step 12: Login error (catch block)', err);
     setIsLoading(false);
@@ -310,10 +298,42 @@ const login = async (email: string, password: string): Promise<{ success: boolea
     }
   };
 
+  const logout = async (): Promise<void> => {
+    console.info('[Auth] Logout: start');
+    try {
+      // Clear Supabase session
+      try {
+        console.info('[Auth] Logout: supabase.auth.signOut()');
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.warn('[Auth] Logout: Supabase signOut error (continuing)', error);
+        }
+      } catch (supabaseError) {
+        console.warn('[Auth] Logout: Supabase signOut threw (continuing)', supabaseError);
+      }
+
+      // Always clear local state regardless of API errors
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      console.info('[Auth] Logout: cleared context state');
+
+      // Force hard navigation to landing page
+      console.info('[Auth] Logout: redirecting to home');
+      window.location.href = '/';
+    } catch (err) {
+      console.error('[Auth] Logout: unexpected error (continuing to redirect)', err);
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      window.location.href = '/';
+    }
+  };
+
 ;
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, login, signup, refreshToken, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, session, login, signup, logout, refreshToken, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

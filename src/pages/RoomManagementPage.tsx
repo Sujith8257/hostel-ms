@@ -20,13 +20,10 @@ import {
   Eye,
   Clock,
   LogOut,
-  Plus,
   Wrench,
   FileText,
   Shield,
   Settings,
-  Database,
-  UserCheck,
   UserPlus,
   BarChart3,
   HelpCircle,
@@ -274,7 +271,7 @@ export function RoomManagementPage() {
                   <User className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Admin User 41542</p>
+                  <p className="text-sm font-medium">{user?.name || 'Admin User'}</p>
                   <p className="text-xs text-muted-foreground">Administrator</p>
                 </div>
               </div>
@@ -306,7 +303,7 @@ export function RoomManagementPage() {
                     <User className="h-4 w-4" />
                   </div>
                   <Badge variant="secondary">Administrator</Badge>
-                  <span className="text-sm text-muted-foreground">AU4</span>
+                  <span className="text-sm text-muted-foreground">{user?.email?.split('@')[0] || 'AU4'}</span>
                 </div>
               </div>
             </div>
@@ -418,7 +415,7 @@ export function RoomManagementPage() {
                 </CardHeader>
                 <CardContent>
                         <div className="space-y-4">
-                          {roomTypes.map((roomType, index) => (
+                          {roomTypes.map((roomType) => (
                             <div key={roomType.type} className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-2">
