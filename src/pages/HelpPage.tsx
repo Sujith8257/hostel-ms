@@ -455,13 +455,13 @@ export function HelpPage() {
                     <div className="text-center p-4 border rounded-lg">
                       <Phone className="h-8 w-8 text-green-600 mx-auto mb-2" />
                       <p className="font-medium">Phone Support</p>
-                      <p className="text-sm text-muted-foreground">+1 (555) 123-4567</p>
+                      <p className="text-sm text-muted-foreground">6304859749</p>
                       <p className="text-xs text-muted-foreground mt-1">Mon-Fri 9AM-6PM</p>
                     </div>
                     <div className="text-center p-4 border rounded-lg">
                       <MessageCircle className="h-8 w-8 text-purple-600 mx-auto mb-2" />
                       <p className="font-medium">Live Chat</p>
-                      <p className="text-sm text-muted-foreground">Available Now</p>
+                      <p className="text-sm text-muted-foreground">Available Now - Meet Pranith</p>
                       <p className="text-xs text-muted-foreground mt-1">Instant Response</p>
                     </div>
                   </div>

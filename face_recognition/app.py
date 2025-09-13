@@ -576,7 +576,7 @@ DASHBOARD_HTML = """
         </div>
 
         <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <!-- Student Registration -->
             <div class="card p-6">
                 <h3 class="text-xl font-semibold mb-4">📝 Student Registration</h3>
@@ -652,32 +652,7 @@ DASHBOARD_HTML = """
                 </div>
             </div>
 
-            <!-- Authentication -->
-            <div class="card p-6">
-                <h3 class="text-xl font-semibold mb-4">🔍 Authentication</h3>
-                
-                <form id="authForm" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Register Number:</label>
-                        <input type="text" id="authRegisterNumber" name="authRegisterNumber" class="form-input" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Face Image:</label>
-                        <input type="file" id="authImageFile" name="authImageFile" accept="image/*" class="form-input" required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Location:</label>
-                        <select id="authLocation" name="authLocation" class="form-input">
-                            <option value="Main Gate">Main Gate</option>
-                            <option value="Building A">Building A</option>
-                            <option value="Building B">Building B</option>
-                            <option value="Library">Library</option>
-                            <option value="Cafeteria">Cafeteria</option>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn-primary w-full">Authenticate</button>
-                </form>
-            </div>
+
         </div>
 
         <!-- Activity Logs -->
@@ -970,29 +945,7 @@ DASHBOARD_HTML = """
         });
 
         // Authentication form handler
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            
-            try {
-                const response = await fetch('/authenticate/', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    addLog(`Authentication successful for ${formData.get('authRegisterNumber')} (${(result.similarity * 100).toFixed(1)}% match)`, 'success');
-                    e.target.reset();
-                    loadStats();
-                } else {
-                    addLog(`Authentication failed for ${formData.get('authRegisterNumber')}`, 'error');
-                }
-            } catch (error) {
-                addLog(`Authentication error: ${error.message}`, 'error');
-            }
-        });
+        // Removed - authentication functionality disabled
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', () => {
@@ -1142,7 +1095,7 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         # Calculate similarity
         cosine_dist = cosine(stored_embedding, embedding)
         raw_similarity = 1 - cosine_dist
-        similarity = raw_similarity + 0.125  # Adjustment as in original code
+        similarity = raw_similarity  # Adjustment as in original code
         threshold = 0.5
         success = bool(similarity > threshold)
         
@@ -1566,7 +1519,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 # Calculate similarity
                 cosine_dist = cosine(stored_embedding, embedding)
                 similarity = 1 - cosine_dist
-                adjusted_similarity = similarity + 0.125  # Adjustment as in original code
+                adjusted_similarity = similarity  # Adjustment as in original code
                 
                 print(f"   Similarity calculation:")
                 print(f"     Cosine distance: {cosine_dist:.6f}")
@@ -1903,4 +1856,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8085)
+    uvicorn.run(app, host="0.0.0.0", port=8005)
