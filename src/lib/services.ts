@@ -5,7 +5,70 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // Student Management
 export const studentService = {
-  async getStudents(): Promise<DbStudent[]> {
+  async getStudents(page = 1, limit = 10, searchTerm = '', statusFilter = 'all'): Promise<{ students: DbStudent[], total: number, totalPages: number }> {
+    // Calculate offset for pagination
+    const offset = (page - 1) * limit;
+    
+    // Build the query
+    let query = supabase
+      .from('students')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+    
+    // Apply search filter if provided
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      query = query.or(`full_name.ilike.%${term}%,register_number.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,room_number.ilike.%${term}%`);
+    }
+    
+    // Apply status filter if provided
+    if (statusFilter !== 'all') {
+      switch (statusFilter) {
+        case 'active':
+          query = query.eq('is_active', true);
+          break;
+        case 'inactive':
+          query = query.eq('is_active', false);
+          break;
+        case 'residents':
+          query = query.eq('hostel_status', 'resident');
+          break;
+        case 'day_scholars':
+          query = query.eq('hostel_status', 'day_scholar');
+          break;
+        case 'with_rooms':
+          query = query.not('room_number', 'is', null);
+          break;
+        case 'without_rooms':
+          query = query.is('room_number', null);
+          break;
+        case 'face_enrolled':
+          query = query.not('face_embedding', 'is', null);
+          break;
+        case 'face_not_enrolled':
+          query = query.is('face_embedding', null);
+          break;
+      }
+    }
+    
+    // Apply pagination
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1);
+    
+    if (error) throw error;
+    
+    const total = count || 0;
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      students: data || [],
+      total,
+      totalPages
+    };
+  },
+
+  async getAllStudents(): Promise<DbStudent[]> {
+    // Keep this method for backward compatibility
     // Try with a very high limit first
     const { data, error } = await supabase
       .from('students')
