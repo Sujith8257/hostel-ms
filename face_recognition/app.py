@@ -335,6 +335,135 @@ def preprocess_face(image):
         return np.expand_dims(face, axis=0)
 
 # ------------------------------
+# Face detection bbox + annotation helpers
+# ------------------------------
+def detect_face_and_bbox(image):
+    """Detect face with MediaPipe and return (preprocessed_face, (x1,y1,x2,y2))."""
+    with mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5) as face_detection:
+        results = face_detection.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        if not results.detections:
+            return None, None
+        bbox = results.detections[0].location_data.relative_bounding_box
+        h, w, _ = image.shape
+        x1, y1 = max(0, int(bbox.xmin * w)), max(0, int(bbox.ymin * h))
+        x2, y2 = min(w, x1 + int(bbox.width * w)), min(h, y1 + int(bbox.height * h))
+        face = image[y1:y2, x1:x2]
+        if face.size == 0:
+            return None, None
+        face = cv2.resize(face, (112, 112))
+        face = face.astype("float32") / 127.5 - 1.0
+        face = np.expand_dims(face, axis=0)
+        return face, (x1, y1, x2, y2)
+
+def _draw_text_with_bg(img, text, org, font_scale=0.6, thickness=2, text_color=(255,255,255), bg_color=(0,0,0), font=None, line_type=None):
+    if font is None:
+        font = cv2.FONT_HERSHEY_SIMPLEX
+    if line_type is None:
+        line_type = cv2.LINE_AA
+    (tw, th), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+    x, y = org
+    x0 = max(0, x)
+    y0 = max(0, y - th - baseline)
+    x1 = min(img.shape[1] - 1, x + tw)
+    y1 = min(img.shape[0] - 1, y + baseline)
+    cv2.rectangle(img, (x0, y0), (x1, y1), bg_color, -1)
+    cv2.putText(img, text, (x, y - baseline), font, font_scale, text_color, thickness, line_type)
+
+# def annotate_image_with_bbox(image, bbox, top_text, bottom_right_text):
+#     if bbox is None:
+#         return None
+
+#     x1, y1, x2, y2 = bbox
+#     annotated = image.copy()
+#     h, w = annotated.shape[:2]
+
+#     # Draw bbox
+#     cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 0), 2)
+
+#     # --- Register number (top_text) ---
+#     _draw_text_with_bg(
+#         annotated,
+#         str(top_text),
+#         (x1, max(0, y1 - 8)),
+#         font=cv2.FONT_HERSHEY_DUPLEX,
+#         font_scale=0.7,
+#         thickness=1,
+#         bg_color=(0, 128, 0),
+#         text_color=(255, 255, 255),
+#         line_type=cv2.LINE_AA
+#     )
+
+#     # --- Timestamp (bottom_right_text) ---
+#     font = cv2.FONT_HERSHEY_DUPLEX
+#     bottom_scale = 0.6
+#     thickness = 1
+#     (tw, th), baseline = cv2.getTextSize(str(bottom_right_text), font, bottom_scale, thickness)
+#     ts_x = max(0, w - tw - 10)
+#     ts_y = h - 10
+#     _draw_text_with_bg(
+#         annotated,
+#         str(bottom_right_text),
+#         (ts_x, ts_y),
+#         font=font,
+#         font_scale=bottom_scale,
+#         thickness=thickness,
+#         bg_color=(0, 0, 0),
+#         text_color=(255, 255, 255),
+#         line_type=cv2.LINE_AA
+#     )
+
+#     ok, buf = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+#     if not ok:
+#         return None
+#     return base64.b64encode(buf.tobytes()).decode('utf-8')
+
+def annotate_image_with_bbox(image, bbox, top_text, bottom_right_text):
+    if bbox is None:
+        return None
+    x1, y1, x2, y2 = bbox
+    annotated = image.copy()
+    h, w = annotated.shape[:2]
+    # Draw bbox
+      # Draw bbox
+    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 0), 2)
+
+    # --- Register number (top_text) ---
+    _draw_text_with_bg(
+        annotated,
+        str(top_text),
+        (x1, max(0, y1 - 8)),
+        font_scale=0.7,
+        thickness=1,
+        bg_color=(0, 128, 0),
+        text_color=(255, 255, 255),
+        font=cv2.FONT_HERSHEY_DUPLEX,
+        line_type=cv2.LINE_AA
+    )
+
+    # --- Timestamp (bottom_right_text) ---
+    font = cv2.FONT_HERSHEY_DUPLEX
+    bottom_scale = 0.6
+    thickness = 1
+    (tw, th), baseline = cv2.getTextSize(str(bottom_right_text), font, bottom_scale, thickness)
+    ts_x = max(0, w - tw - 10)
+    ts_y = h - 10
+    _draw_text_with_bg(
+        annotated,
+        str(bottom_right_text),
+        (ts_x, ts_y),
+        font_scale=bottom_scale,
+        thickness=thickness,
+        bg_color=(0, 0, 0),
+        text_color=(255, 255, 255),
+        font=font,
+        line_type=cv2.LINE_AA
+    )
+    ok, buf = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+    if not ok:
+        return None
+    return base64.b64encode(buf.tobytes()).decode('utf-8')
+
+# ------------------------------
 # Get embedding
 # ------------------------------
 def get_embedding(face_img):
@@ -725,7 +854,9 @@ DASHBOARD_HTML = """
                 
                 // Update selection in UI
                 document.querySelectorAll('.student-item').forEach(item => item.classList.remove('selected'));
-                event.target.classList.add('selected');
+                if (window.event && window.event.target) {
+                    window.event.target.classList.add('selected');
+                }
                 
                 addLog(`Selected student: ${selectedStudent.full_name} (${registerNumber})`, 'info');
             }
@@ -826,13 +957,18 @@ DASHBOARD_HTML = """
                 });
                 
                 const result = await response.json();
+                console.log('recognize_face result:', result);
+                addLog(`Recognition response: ${result.success ? 'success' : 'failure'}${result.recognized !== undefined ? `, recognized=${result.recognized}` : ''}`, result.success ? 'info' : 'error');
                 
                 if (result.success && result.recognized) {
                     // Student recognized - log successful entry
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-green-100 border border-green-300';
                     statusDiv.textContent = `✅ Welcome ${result.student.full_name}!`;
                     detailsDiv.textContent = `${result.confidence_percentage}% match • Entry logged at ${result.location}`;
-                    
+                    // Show annotated image with bounding box
+                    if (result.annotated_image) {
+                        document.getElementById('capturedImage').src = result.annotated_image;
+                    }
                     addLog(`🎉 Welcome ${result.student.full_name}! (${result.confidence_percentage}% match)`, 'success');
                     addLog(`Entry logged at ${result.location}`, 'success');
                     loadStats(); // Refresh stats
@@ -841,6 +977,10 @@ DASHBOARD_HTML = """
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-yellow-100 border border-yellow-300';
                     statusDiv.textContent = '⚠️ Face detected, no match found';
                     detailsDiv.textContent = `Checked ${result.students_checked} students • Best similarity: ${(result.best_similarity * 100).toFixed(1)}%`;
+                    // Show annotated image even for no-match
+                    if (result.annotated_image) {
+                        document.getElementById('capturedImage').src = result.annotated_image;
+                    }
                     
                     addLog(`👤 Face detected but no matching student found (checked ${result.students_checked} records)`, 'error');
                     if (result.best_similarity > 0) {
@@ -849,7 +989,8 @@ DASHBOARD_HTML = """
                 } else {
                     // No face detected
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-red-100 border border-red-300';
-                    statusDiv.textContent = '❌ No face detected';
+                    const msg = result && result.message ? result.message : 'No face detected';
+                    statusDiv.textContent = `❌ ${msg}`;
                     detailsDiv.textContent = 'Please ensure your face is clearly visible and try again';
                     
                     addLog('❌ No face detected in captured image', 'error');
@@ -993,8 +1134,8 @@ async def register_from_dashboard(register_number: str = Form(...), file: Upload
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face = preprocess_face(image)
-        if face is None:
+        face, bbox = detect_face_and_bbox(image)
+        if face is None or bbox is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
         embedding = get_embedding(face)
@@ -1005,11 +1146,16 @@ async def register_from_dashboard(register_number: str = Form(...), file: Upload
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save face data to database")
 
+        timestamp_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(register_number), bottom_right_text=timestamp_str)
+
         return {
             "success": True, 
             "message": f"Face recognition enrolled for student {register_number}",
             "register_number": register_number,
-            "embedding_size": len(embedding)
+            "embedding_size": len(embedding),
+            "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
+            "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
         }
     except HTTPException:
         raise
@@ -1024,8 +1170,8 @@ async def register(register_number: str = Form(...), full_name: str = Form(None)
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face = preprocess_face(image)
-        if face is None:
+        face, bbox = detect_face_and_bbox(image)
+        if face is None or bbox is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
         embedding = get_embedding(face)
@@ -1036,11 +1182,16 @@ async def register(register_number: str = Form(...), full_name: str = Form(None)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save face data to database")
 
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(register_number), bottom_right_text=ts)
         return {
             "success": True, 
             "message": f"Student {register_number} registered successfully",
             "register_number": register_number,
-            "full_name": full_name
+            "full_name": full_name,
+            "embedding_size": len(embedding),
+            "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
+            "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
         }
     except HTTPException:
         raise
@@ -1081,8 +1232,8 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face = preprocess_face(image)
-        if face is None:
+        face, bbox = detect_face_and_bbox(image)
+        if face is None or bbox is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
         embedding = get_embedding(face)
@@ -1127,15 +1278,22 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
                 notes=f'Auto-marked via face recognition (confidence: {similarity:.2%})'
             )
             
+            # Prepare annotated response
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(register_number), bottom_right_text=ts)
             return {
                 "success": success, 
+                "recognized": True,
                 "similarity": float(similarity),
                 "register_number": register_number,
                 "student_name": student_info['full_name'],
                 "message": "Authentication successful",
                 "entry_logged": entry_logged,
                 "attendance_logged": attendance_logged,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
+                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None),
+                "location": location
             }
         else:
             # Log failed entry attempt
@@ -1147,11 +1305,17 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
                 location=location
             )
             
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S');
+            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text="Unknown", bottom_right_text=ts)
             return {
                 "success": success, 
+                "recognized": False,
                 "similarity": float(similarity),
                 "register_number": register_number,
-                "message": "Authentication failed - insufficient similarity"
+                "message": "Authentication failed - insufficient similarity",
+                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
+                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None),
+                "location": location
             }
     except HTTPException:
         raise
@@ -1393,8 +1557,8 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face = preprocess_face(image)
-        if face is None:
+        face, bbox = detect_face_and_bbox(image)
+        if face is None or bbox is None:
             return {
                 "success": False,
                 "message": "No face detected in the image",
@@ -1402,7 +1566,6 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
             }
 
         embedding = get_embedding(face)
-        
         # Get all students with face embeddings (filter at database level)
         students = get_all_students(limit=2000)
         print(f"📊 Database query results:")
@@ -1551,7 +1714,8 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
             print(f"   Confidence: {round(best_similarity * 100, 1)}%")
             print(f"   Location: {location}")
             
-            # Log entry for recognized student
+            print(f"[DEBUG] Matched student: {best_match['register_number']} ({best_match['full_name']}) with similarity {best_similarity:.4f}")
+            print(f"[DEBUG] Bounding box: {bbox}")
             entry_logged = log_entry(
                 register_number=best_match['register_number'],
                 student_name=best_match['full_name'],
@@ -1559,15 +1723,21 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 confidence_score=float(best_similarity),
                 location=location
             )
-            
             # Log attendance (mark as present)
-            attendance_logged = log_attendance(
-                student_id=best_match['id'],
-                marked_by=best_match['id'],  # Self-marked for face recognition
-                status='present',
-                notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
-            )
-            
+            try:
+                attendance_logged = log_attendance(
+                    student_id=best_match['id'],
+                    marked_by=best_match['id'],  # Self-marked for face recognition
+                    status='present',
+                    notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
+                )
+            except Exception as att_err:
+                print(f"[ERROR] Attendance logging failed: {att_err}")
+                attendance_logged = False
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(best_match['register_number']), bottom_right_text=ts)
+            print(f"[DEBUG] Annotated image base64 length: {len(annotated_b64) if annotated_b64 else 'None'}")
+            print(f"[DEBUG] Returning bbox and annotated image in response.")
             return {
                 "success": True,
                 "recognized": True,
@@ -1581,9 +1751,17 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "location": location,
                 "entry_logged": entry_logged,
                 "attendance_logged": attendance_logged,
-                "message": f"Welcome {best_match['full_name']}! Entry logged successfully."
+                "message": f"Welcome {best_match['full_name']}! Entry logged successfully.",
+                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
+                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
             }
         else:
+            print(f"[DEBUG] No match found. Best similarity: {best_similarity:.4f}")
+            print(f"[DEBUG] Bounding box: {bbox}")
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text="Unknown", bottom_right_text=ts)
+            print(f"[DEBUG] Annotated image base64 length: {len(annotated_b64) if annotated_b64 else 'None'}")
+            print(f"[DEBUG] Returning bbox and annotated image in response.")
             return {
                 "success": True,
                 "recognized": False,
@@ -1591,9 +1769,11 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "best_similarity": float(best_similarity) if best_match else 0.0,
                 "threshold": recognition_threshold,
                 "students_checked": len(students_with_faces),
-                "message": "Face detected but no matching student found in database."
+                "message": "Face detected but no matching student found in database.",
+                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
+                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
             }
-            
+
     except Exception as e:
         return {
             "success": False,
@@ -1630,11 +1810,11 @@ async def cleanup_invalid_embeddings():
                         print(f"Failed to convert list to array for {register_number}: {e}")
                         invalid_count += 1
                         continue
-                        
+                    
                 elif isinstance(embedding_data, str):
                     # Legacy base64 encoded data - convert to JSONB list
                     embedding_bytes = decode_base64_embedding(embedding_data)
-                    if embedding_bytes is None:
+                    if not embedding_bytes:
                         print(f"Invalid base64 embedding for {register_number}")
                         invalid_count += 1
                         continue
@@ -1659,8 +1839,8 @@ async def cleanup_invalid_embeddings():
                         print(f"Failed to decode embedding for {register_number}: {e}")
                         invalid_count += 1
                         continue
-                        
-                elif isinstance(embedding_data, bytes):
+                    
+                elif isinstance(embedding_data, (bytes, bytearray)):
                     # Legacy raw bytes data - convert to JSONB list
                     try:
                         embedding = np.frombuffer(embedding_data, dtype=np.float32)
@@ -1682,14 +1862,14 @@ async def cleanup_invalid_embeddings():
                         print(f"Failed to decode raw bytes for {register_number}: {e}")
                         invalid_count += 1
                         continue
-                        
+                    
                 else:
                     print(f"Unknown embedding data type for {register_number}: {type(embedding_data)}")
                     invalid_count += 1
                     continue
-                    
+                
                 # If we get here, the embedding is valid
-                print(f"Valid embedding for {register_number}: shape {embedding.shape}")
+                print(f"Valid embedding for {register_number}: length {len(embedding)}")
         
         return {
             "success": True,
@@ -1751,17 +1931,17 @@ async def get_dashboard_stats():
     """Get dashboard statistics"""
     try:
         # Total students
-        total_students_result = supabase.table('students').select('id', count='exact').eq('is_active', True).execute()
-        total_students = total_students_result.count if hasattr(total_students_result, 'count') else len(total_students_result.data)
+        total_students_data = supabase.table('students').select('id', count='exact').eq('is_active', True).execute()
+        total_students = (total_students_data.count if hasattr(total_students_data, 'count') and total_students_data.count is not None else len(total_students_data.data))
         
         # Today's entries
-        today = date.today().isoformat()
-        today_entries_result = supabase.table('entry_logs').select('id', count='exact').gte('created_at', f'{today}T00:00:00').execute()
-        today_entries = today_entries_result.count if hasattr(today_entries_result, 'count') else len(today_entries_result.data)
+        today = datetime.now().strftime('%Y-%m-%d')
+        today_entries_data = supabase.table('entry_logs').select('id', count='exact').gte('created_at', f"{today}T00:00:00").execute()
+        today_entries = (today_entries_data.count if hasattr(today_entries_data, 'count') and today_entries_data.count is not None else len(today_entries_data.data))
         
         # Present today
-        present_today_result = supabase.table('attendance_logs').select('id', count='exact').eq('date', today).eq('status', 'present').execute()
-        present_today = present_today_result.count if hasattr(present_today_result, 'count') else len(present_today_result.data)
+        present_today_data = supabase.table('attendance_logs').select('id', count='exact').eq('date', today).eq('status', 'present').execute()
+        present_today = (present_today_data.count if hasattr(present_today_data, 'count') and present_today_data.count is not None else len(present_today_data.data))
         
         return {
             "total_students": total_students,
@@ -1791,7 +1971,7 @@ async def get_recent_entries(limit: int = 20):
 async def get_attendance_today():
     """Get today's attendance records"""
     try:
-        today = date.today().isoformat()
+        today = datetime.now().strftime('%Y-%m-%d')
         result = supabase.table('attendance_logs').select('*, students(register_number, full_name)').eq('date', today).execute()
         return {"success": True, "attendance": result.data}
     except Exception as e:
@@ -1820,7 +2000,7 @@ async def debug_students():
                 
                 # Track data types
                 data_type = type(face_data).__name__
-                debug_info["face_data_types"][data_type] = debug_info["face_data_types"].get(data_type, 0) + 1
+                debug_info["face_data_types"][data_type] = (debug_info["face_data_types"].get(data_type, 0) + 1)
             
             # Include first 3 students as samples
             if i < 3:
@@ -1828,8 +2008,8 @@ async def debug_students():
                     "register_number": student.get('register_number'),
                     "full_name": student.get('full_name'),
                     "has_face_data": bool(face_data),
-                    "face_data_type": type(face_data).__name__ if face_data else None,
-                    "face_data_length": len(face_data) if isinstance(face_data, (list, str, bytes)) else None
+                    "face_data_type": type(face_data).__name__ if face_data is not None else None,
+                    "face_data_length": (len(face_data) if isinstance(face_data, (list, str, bytes, bytearray)) else None)
                 }
                 
                 if isinstance(face_data, list) and len(face_data) > 0:
