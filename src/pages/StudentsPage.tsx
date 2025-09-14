@@ -39,11 +39,12 @@ import {
   HelpCircle,
   Building2
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { studentService } from '@/lib/services';
+import { studentService, subscribeToStudents } from '@/lib/services';
 import { roomApi, adminApi } from '@/api/client';
 import type { DbStudent } from '@/types/database-models';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
 interface StudentFormData {
@@ -91,7 +92,6 @@ interface StudentStats {
 
 export function StudentsPage() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
@@ -127,6 +127,12 @@ export function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   
   // Room allocation states
   const [isRoomAllocationOpen, setIsRoomAllocationOpen] = useState(false);
@@ -194,7 +200,44 @@ export function StudentsPage() {
     });
   }, [students]);
 
-  const filterStudents = useCallback(() => {
+
+  // Load data on component mount and when pagination/filters change
+  useEffect(() => {
+    const loadDataWithFallback = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const timeoutMs = 10000;
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Connection to Supabase timed out (10s). Check policies/env and try again.')), timeoutMs)
+        );
+
+        const result = await Promise.race([
+          studentService.getAllStudents(),
+          timeoutPromise
+        ]);
+        
+        console.log(`Loaded ${result.length} students from database`);
+        setStudents(result);
+        
+        // If no students found, show a helpful message
+        if (result.length === 0) {
+          console.log('No students found in database. This might be due to RLS policies or empty database.');
+        }
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load students');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadDataWithFallback();
+  }, []); // Only load once on mount
+
+  // Filter students instantly when search term or filter changes
+  useEffect(() => {
     let filtered = students;
 
     // Apply search filter
@@ -240,166 +283,63 @@ export function StudentsPage() {
     }
 
     setFilteredStudents(filtered);
-  }, [students, searchTerm, statusFilter]);
+    setTotalStudents(filtered.length);
+    setTotalPages(Math.ceil(filtered.length / itemsPerPage));
+    setCurrentPage(1); // Reset to first page when filtering
+  }, [students, searchTerm, statusFilter, itemsPerPage]);
 
-  // Load data on component mount
-  useEffect(() => {
-    const loadDataWithFallback = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Try to load from API with timeout
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 3000)
-        );
-        
-        const studentsData = await Promise.race([
-          studentService.getStudents(),
-          timeoutPromise
-        ]) as DbStudent[];
-        
-        console.log(`Loaded ${studentsData.length} students from database`);
-        setStudents(studentsData);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('Error loading data:', err);
-        
-        // Fallback to mock data if API fails
-        console.log('Using fallback mock data');
-        const mockStudents: DbStudent[] = [
-          {
-            id: '1',
-            register_number: 'REG001',
-            full_name: 'John Doe',
-            email: 'john.doe@example.com',
-            phone: '+1234567890',
-            hostel_status: 'resident',
-            room_number: 'A-101',
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            register_number: 'REG002',
-            full_name: 'Jane Smith',
-            email: 'jane.smith@example.com',
-            phone: '+1234567891',
-            hostel_status: 'day_scholar',
-            room_number: null,
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '3',
-            register_number: 'REG003',
-            full_name: 'Bob Johnson',
-            email: 'bob.johnson@example.com',
-            phone: '+1234567892',
-            hostel_status: 'resident',
-            room_number: 'B-205',
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-        
-        setStudents(mockStudents);
-        setIsLoading(false);
-        toast.info('Using demo data - API connection failed');
-      }
-    };
-
-    loadDataWithFallback();
-  }, []);
-
-  // Filter students when search term or filter changes
-  useEffect(() => {
-    filterStudents();
-  }, [filterStudents]);
+  // Get paginated students for display
+  const paginatedStudents = filteredStudents.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Calculate stats when students data changes
   useEffect(() => {
     calculateStats();
   }, [calculateStats]);
 
+  // Realtime subscription to students table
+  useEffect(() => {
+    const channel = subscribeToStudents((payload: RealtimePostgresChangesPayload<DbStudent>) => {
+      const event = payload.eventType;
+      if (event === 'INSERT') {
+        const newStudent = payload.new as DbStudent;
+        setStudents(prev => [newStudent, ...prev]);
+      } else if (event === 'UPDATE') {
+        const updated = payload.new as DbStudent;
+        setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+      } else if (event === 'DELETE') {
+        const removed = payload.old as DbStudent;
+        setStudents(prev => prev.filter(s => s.id !== removed.id));
+      }
+    });
+
+    return () => {
+      channel?.unsubscribe();
+    };
+  }, []);
+
   const loadData = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Try to load from API with timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 5000)
+      const timeoutMs = 10000;
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Connection to Supabase timed out (10s). Check policies/env and try again.')), timeoutMs)
       );
-      
-      const studentsData = await Promise.race([
-        studentService.getStudents(),
+
+      const result = await Promise.race([
+        studentService.getAllStudents(),
         timeoutPromise
-      ]) as DbStudent[];
+      ]);
       
-      console.log(`Loaded ${studentsData.length} students from database`);
-      setStudents(studentsData);
+      console.log(`Loaded ${result.length} students from database`);
+      setStudents(result);
     } catch (err) {
       console.error('Error loading data:', err);
-      
-      // Fallback to mock data if API fails
-      console.log('Using fallback mock data');
-      const mockStudents: DbStudent[] = [
-        {
-          id: '1',
-          register_number: 'REG001',
-          full_name: 'John Doe',
-          email: 'john.doe@example.com',
-          phone: '+1234567890',
-          hostel_status: 'resident',
-          room_number: 'A-101',
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          register_number: 'REG002',
-          full_name: 'Jane Smith',
-          email: 'jane.smith@example.com',
-          phone: '+1234567891',
-          hostel_status: 'day_scholar',
-          room_number: null,
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          register_number: 'REG003',
-          full_name: 'Bob Johnson',
-          email: 'bob.johnson@example.com',
-          phone: '+1234567892',
-          hostel_status: 'resident',
-          room_number: 'B-205',
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      setStudents(mockStudents);
-      toast.info('Using demo data - API connection failed');
+      setError(err instanceof Error ? err.message : 'Failed to load students');
     } finally {
       setIsLoading(false);
     }
@@ -1353,7 +1293,7 @@ export function StudentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStudents.length === 0 ? (
+                    {paginatedStudents.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8">
                           <div className="text-muted-foreground">
@@ -1361,6 +1301,22 @@ export function StudentsPage() {
                             <p>No students found</p>
                             {searchTerm || statusFilter !== 'all' ? (
                               <p className="text-sm">Try adjusting your search or filters</p>
+                            ) : students.length === 0 ? (
+                              <div className="space-y-2">
+                                <p className="text-sm">No students in database</p>
+                                <p className="text-xs text-red-600">
+                                  This might be due to RLS policies or empty database. 
+                                  Check Supabase console for data and policies.
+                                </p>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={loadData}
+                                  className="mt-2"
+                                >
+                                  Refresh
+                                </Button>
+                              </div>
                             ) : (
                               <p className="text-sm">Start by adding your first student</p>
                             )}
@@ -1368,7 +1324,7 @@ export function StudentsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStudents.map((student) => (
+                      paginatedStudents.map((student) => (
                         <TableRow key={student.id}>
                           <TableCell>
                             <div>
@@ -1500,6 +1456,101 @@ export function StudentsPage() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+              
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between px-6 py-4 border-t">
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalStudents)} of {totalStudents} students
+                  </p>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm text-muted-foreground">Rows per page:</p>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(value) => {
+                        setItemsPerPage(parseInt(value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      First
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className="w-8 h-8 p-0"
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Last
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

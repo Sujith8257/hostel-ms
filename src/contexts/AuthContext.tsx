@@ -3,6 +3,7 @@ import type { User, UserRole } from '@/types';
 import type { DbProfile } from '@/types/database-models';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { authApi } from '@/api/client';
 
 
 interface AuthContextType {
@@ -293,63 +294,51 @@ const login = async (email: string, password: string): Promise<{ success: boolea
   const logout = async (): Promise<void> => {
     console.info('[Auth] Logout: start');
     try {
-      // Clear Supabase session and all cached data
-      try {
-        console.info('[Auth] Logout: supabase.auth.signOut()');
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          console.warn('[Auth] Logout: Supabase signOut error (continuing)', error);
-        }
-      } catch (supabaseError) {
+      // Fire-and-forget: backend logout
+      console.info('[Auth] Logout: initiating backend logout');
+      void authApi.logout().catch((apiError) => {
+        console.warn('[Auth] Logout: backend logout threw (continuing)', apiError);
+      });
+
+      // Fire-and-forget: Supabase signOut
+      void supabase.auth.signOut().catch((supabaseError) => {
         console.warn('[Auth] Logout: Supabase signOut threw (continuing)', supabaseError);
-      }
+      });
 
-      // Clear all Supabase cached data
-      try {
-        console.info('[Auth] Logout: clearing Supabase cache');
-        // Clear any cached queries or data
-        await supabase.from('profiles').select('*').limit(0); // This clears any cached profile data
-        // Clear any other cached tables if needed
-        await supabase.from('students').select('*').limit(0);
-        await supabase.from('rooms').select('*').limit(0);
-        await supabase.from('payments').select('*').limit(0);
-        await supabase.from('attendance').select('*').limit(0);
-        await supabase.from('notifications').select('*').limit(0);
-        await supabase.from('documents').select('*').limit(0);
-        console.info('[Auth] Logout: Supabase cache cleared');
-      } catch (cacheError) {
-        console.warn('[Auth] Logout: Cache clear error (continuing)', cacheError);
-      }
+      // Fire-and-forget: clear potential Supabase caches
+      void Promise.allSettled([
+        supabase.from('profiles').select('*').limit(0),
+        supabase.from('students').select('*').limit(0),
+        supabase.from('rooms').select('*').limit(0),
+        supabase.from('payments').select('*').limit(0),
+        supabase.from('attendance').select('*').limit(0),
+        supabase.from('notifications').select('*').limit(0),
+        supabase.from('documents').select('*').limit(0),
+      ]);
 
-      // Clear local storage and session storage
+      // Synchronous: clear browser storage and local state immediately
       try {
-        console.info('[Auth] Logout: clearing browser storage');
         localStorage.clear();
         sessionStorage.clear();
-        console.info('[Auth] Logout: browser storage cleared');
       } catch (storageError) {
         console.warn('[Auth] Logout: Storage clear error (continuing)', storageError);
       }
-
-      // Always clear local state regardless of API errors
       setUser(null);
       setProfile(null);
       setSession(null);
       setIsLoading(false);
-      console.info('[Auth] Logout: cleared context state');
 
-      // Force a hard redirect to home page to clear all cached data
-      console.info('[Auth] Logout: redirecting to home page');
-      window.location.href = '/';
-      
+      // Immediate hard redirect to landing page
+      window.location.replace('/');
+
     } catch (err) {
-      console.error('[Auth] Logout: unexpected error (continuing to redirect)', err);
+      // Failsafe: still redirect
+      console.error('[Auth] Logout: unexpected error (failsafe redirect)', err);
       setUser(null);
       setProfile(null);
       setSession(null);
       setIsLoading(false);
-      // Force redirect even on error
-      window.location.href = '/';
+      window.location.replace('/');
     }
   };
 

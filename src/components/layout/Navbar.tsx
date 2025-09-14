@@ -135,7 +135,7 @@ export function Navbar() {
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600" disabled={isLoggingOut}>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleLogout(); }} className="text-red-600" disabled={isLoggingOut}>
                     {isLoggingOut ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (

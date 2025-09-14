@@ -5,49 +5,125 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // Student Management
 export const studentService = {
-  async getStudents(): Promise<DbStudent[]> {
-    // Try with a very high limit first
-    const { data, error } = await supabase
+  async getStudents(page = 1, limit = 10, searchTerm = '', statusFilter = 'all'): Promise<{ students: DbStudent[], total: number, totalPages: number }> {
+    // Calculate offset for pagination
+    const offset = (page - 1) * limit;
+    
+    // Build the query
+    let query = supabase
       .from('students')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50000); // Set a very high limit
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+    
+    // Apply search filter if provided
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      query = query.or(`full_name.ilike.%${term}%,register_number.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%,room_number.ilike.%${term}%`);
+    }
+    
+    // Apply status filter if provided
+    if (statusFilter !== 'all') {
+      switch (statusFilter) {
+        case 'active':
+          query = query.eq('is_active', true);
+          break;
+        case 'inactive':
+          query = query.eq('is_active', false);
+          break;
+        case 'residents':
+          query = query.eq('hostel_status', 'resident');
+          break;
+        case 'day_scholars':
+          query = query.eq('hostel_status', 'day_scholar');
+          break;
+        case 'with_rooms':
+          query = query.not('room_number', 'is', null);
+          break;
+        case 'without_rooms':
+          query = query.is('room_number', null);
+          break;
+        case 'face_enrolled':
+          query = query.not('face_embedding', 'is', null);
+          break;
+        case 'face_not_enrolled':
+          query = query.is('face_embedding', null);
+          break;
+      }
+    }
+    
+    // Apply pagination
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1);
     
     if (error) throw error;
     
-    // If we got exactly 1000 results, it means we might be hitting a limit
-    // In that case, fall back to pagination
-    if (data && data.length === 1000) {
-      console.warn('Potential limit reached, using pagination...');
-      
-      // Use pagination to fetch all students
-      let allStudents: DbStudent[] = [...data]; // Start with what we already have
-      let start = 1000;
-      const batchSize = 1000;
-      let hasMore = true;
+    const total = count || 0;
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      students: data || [],
+      total,
+      totalPages
+    };
+  },
 
-      while (hasMore) {
-        const { data: nextBatch, error: nextError } = await supabase
-          .from('students')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(start, start + batchSize - 1);
-        
-        if (nextError) throw nextError;
-        
-        if (nextBatch && nextBatch.length > 0) {
-          allStudents = allStudents.concat(nextBatch);
-          start += batchSize;
-          hasMore = nextBatch.length === batchSize;
-        } else {
-          hasMore = false;
+  async getAllStudents(): Promise<DbStudent[]> {
+    try {
+      // Try with a very high limit first
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50000); // Set a very high limit
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        // If it's an RLS policy error, return empty array instead of throwing
+        if (error.message.includes('policy') || error.message.includes('RLS')) {
+          console.warn('RLS policy blocking access, returning empty array');
+          return [];
         }
+        throw error;
       }
       
-      return allStudents;
+      // If we got exactly 1000 results, it means we might be hitting a limit
+      // In that case, fall back to pagination
+      if (data && data.length === 1000) {
+        console.warn('Potential limit reached, using pagination...');
+        
+        // Use pagination to fetch all students
+        let allStudents: DbStudent[] = [...data]; // Start with what we already have
+        let start = 1000;
+        const batchSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data: nextBatch, error: nextError } = await supabase
+            .from('students')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .range(start, start + batchSize - 1);
+          
+          if (nextError) throw nextError;
+          
+          if (nextBatch && nextBatch.length > 0) {
+            allStudents = allStudents.concat(nextBatch);
+            start += batchSize;
+            hasMore = nextBatch.length === batchSize;
+          } else {
+            hasMore = false;
+          }
+        }
+        
+        return allStudents;
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      // Return empty array instead of throwing to prevent page crash
+      return [];
     }
-    
-    return data || [];
   },
 
   async getStudent(id: string): Promise<DbStudent> {
