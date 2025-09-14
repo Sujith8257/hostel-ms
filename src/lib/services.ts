@@ -68,62 +68,49 @@ export const studentService = {
   },
 
   async getAllStudents(): Promise<DbStudent[]> {
-    try {
-      // Try with a very high limit first
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50000); // Set a very high limit
+    // Keep this method for backward compatibility
+    // Try with a very high limit first
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50000); // Set a very high limit
+    
+    if (error) throw error;
+    
+    // If we got exactly 1000 results, it means we might be hitting a limit
+    // In that case, fall back to pagination
+    if (data && data.length === 1000) {
+      console.warn('Potential limit reached, using pagination...');
       
-      if (error) {
-        console.error('Supabase error:', error);
-        // If it's an RLS policy error, return empty array instead of throwing
-        if (error.message.includes('policy') || error.message.includes('RLS')) {
-          console.warn('RLS policy blocking access, returning empty array');
-          return [];
-        }
-        throw error;
-      }
-      
-      // If we got exactly 1000 results, it means we might be hitting a limit
-      // In that case, fall back to pagination
-      if (data && data.length === 1000) {
-        console.warn('Potential limit reached, using pagination...');
-        
-        // Use pagination to fetch all students
-        let allStudents: DbStudent[] = [...data]; // Start with what we already have
-        let start = 1000;
-        const batchSize = 1000;
-        let hasMore = true;
+      // Use pagination to fetch all students
+      let allStudents: DbStudent[] = [...data]; // Start with what we already have
+      let start = 1000;
+      const batchSize = 1000;
+      let hasMore = true;
 
-        while (hasMore) {
-          const { data: nextBatch, error: nextError } = await supabase
-            .from('students')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .range(start, start + batchSize - 1);
-          
-          if (nextError) throw nextError;
-          
-          if (nextBatch && nextBatch.length > 0) {
-            allStudents = allStudents.concat(nextBatch);
-            start += batchSize;
-            hasMore = nextBatch.length === batchSize;
-          } else {
-            hasMore = false;
-          }
-        }
+      while (hasMore) {
+        const { data: nextBatch, error: nextError } = await supabase
+          .from('students')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(start, start + batchSize - 1);
         
-        return allStudents;
+        if (nextError) throw nextError;
+        
+        if (nextBatch && nextBatch.length > 0) {
+          allStudents = allStudents.concat(nextBatch);
+          start += batchSize;
+          hasMore = nextBatch.length === batchSize;
+        } else {
+          hasMore = false;
+        }
       }
       
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching students:', error);
-      // Return empty array instead of throwing to prevent page crash
-      return [];
+      return allStudents;
     }
+    
+    return data || [];
   },
 
   async getStudent(id: string): Promise<DbStudent> {

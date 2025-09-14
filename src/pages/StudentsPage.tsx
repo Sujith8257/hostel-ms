@@ -41,10 +41,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { studentService, subscribeToStudents } from '@/lib/services';
 import { roomApi, adminApi } from '@/api/client';
 import type { DbStudent } from '@/types/database-models';
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
 interface StudentFormData {
@@ -201,40 +199,248 @@ export function StudentsPage() {
   }, [students]);
 
 
-  // Load data on component mount and when pagination/filters change
+  // Load dummy data on component mount
   useEffect(() => {
-    const loadDataWithFallback = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const timeoutMs = 10000;
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Connection to Supabase timed out (10s). Check policies/env and try again.')), timeoutMs)
-        );
-
-        const result = await Promise.race([
-          studentService.getAllStudents(),
-          timeoutPromise
-        ]);
-        
-        console.log(`Loaded ${result.length} students from database`);
-        setStudents(result);
-        
-        // If no students found, show a helpful message
-        if (result.length === 0) {
-          console.log('No students found in database. This might be due to RLS policies or empty database.');
+    const loadDummyData = () => {
+      setIsLoading(true);
+      setError(null);
+      
+      // Dummy student data matching your database format
+      const dummyStudents: DbStudent[] = [
+        {
+          id: '1',
+          register_number: '99220041984',
+          full_name: 'TUMMALA HARSHA VARDHAN',
+          email: 'harshavardhantummala89@gmail.com',
+          phone: '+91 7989418258',
+          hostel_status: 'resident',
+          room_number: 'A101',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-15T10:30:00Z',
+          updated_at: '2024-01-15T10:30:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '2',
+          register_number: '9922005300',
+          full_name: 'KAYAKOKULA NAVEEN',
+          email: 'naveenkayakokula@gmail.com',
+          phone: '+91 9876543210',
+          hostel_status: 'resident',
+          room_number: 'A102',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-16T09:15:00Z',
+          updated_at: '2024-01-16T09:15:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '3',
+          register_number: '99220040074',
+          full_name: 'JASTHI JASWANTH',
+          email: 'jasthijaswanth87@gmail.com',
+          phone: '+91 8765432109',
+          hostel_status: 'day_scholar',
+          room_number: null,
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-17T14:20:00Z',
+          updated_at: '2024-01-17T14:20:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '4',
+          register_number: '99220040075',
+          full_name: 'KUNAL RAJ',
+          email: 'kunalrajsingh348@gmail.com',
+          phone: '+91 7654321098',
+          hostel_status: 'resident',
+          room_number: 'B201',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-18T11:45:00Z',
+          updated_at: '2024-01-18T11:45:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '5',
+          register_number: '99220040076',
+          full_name: 'ATLURI TANUJA',
+          email: 'atluritanuja288@gmail.com',
+          phone: '+91 6543210987',
+          hostel_status: 'resident',
+          room_number: 'A103',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-19T16:30:00Z',
+          updated_at: '2024-01-19T16:30:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '6',
+          register_number: '99220040077',
+          full_name: 'KAMALAKURI VENKATA SUDHARSHAN',
+          email: 'sudharshanreddy1320@gmail.com',
+          phone: '+91 5432109876',
+          hostel_status: 'resident',
+          room_number: 'B202',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-20T08:00:00Z',
+          updated_at: '2024-01-20T08:00:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '7',
+          register_number: '99220040078',
+          full_name: 'MALINENI VENKATA ARUNKUMAR',
+          email: 'arunchowdary0369@gmail.com',
+          phone: '+91 4321098765',
+          hostel_status: 'day_scholar',
+          room_number: null,
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-21T13:15:00Z',
+          updated_at: '2024-01-21T13:15:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '8',
+          register_number: '99220040079',
+          full_name: 'MANDLA VENKATA PRANEETH',
+          email: 'venkatapraneet2133@gmail.com',
+          phone: '+91 3210987654',
+          hostel_status: 'resident',
+          room_number: 'A104',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-22T12:30:00Z',
+          updated_at: '2024-01-22T12:30:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '9',
+          register_number: '9922005303',
+          full_name: 'NIRANJAN D',
+          email: '9922005303@klu.ac.in',
+          phone: '+91 2109876543',
+          hostel_status: 'resident',
+          room_number: 'B203',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-23T15:45:00Z',
+          updated_at: '2024-01-23T15:45:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '10',
+          register_number: '99220040080',
+          full_name: 'RANJITH M',
+          email: 'ranjisid13@gmail.com',
+          phone: '+91 1098765432',
+          hostel_status: 'day_scholar',
+          room_number: null,
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-24T10:20:00Z',
+          updated_at: '2024-01-24T10:20:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '11',
+          register_number: '99220040081',
+          full_name: 'SAMINENI SAI KUMAR',
+          email: 'saikumarsamineni1@gmail.com',
+          phone: '+91 9876543211',
+          hostel_status: 'resident',
+          room_number: 'A105',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-25T09:30:00Z',
+          updated_at: '2024-01-25T09:30:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '12',
+          register_number: '9922001045',
+          full_name: 'ANUSHA DEVI BALASUNDARATHURAI',
+          email: '9922001045@klu.ac.in',
+          phone: '+91 8765432110',
+          hostel_status: 'resident',
+          room_number: 'B204',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-26T14:15:00Z',
+          updated_at: '2024-01-26T14:15:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '13',
+          register_number: '99220040082',
+          full_name: 'JAMMANA RAJANIKAR REDDY',
+          email: 'rajanikarreddy354@gmail.com',
+          phone: '+91 7654321109',
+          hostel_status: 'day_scholar',
+          room_number: null,
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-27T11:45:00Z',
+          updated_at: '2024-01-27T11:45:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '14',
+          register_number: '99220040083',
+          full_name: 'DHIVYA M',
+          email: 'dhivyamurugan2011@gmail.com',
+          phone: '+91 6543211098',
+          hostel_status: 'resident',
+          room_number: 'A106',
+          profile_image_url: null,
+          is_active: true,
+          created_at: '2024-01-28T16:20:00Z',
+          updated_at: '2024-01-28T16:20:00Z',
+          building_id: null,
+          face_embedding: null
+        },
+        {
+          id: '15',
+          register_number: '99220040084',
+          full_name: 'PRIYA SHARMA',
+          email: 'priyasharma123@gmail.com',
+          phone: '+91 5432110987',
+          hostel_status: 'former_resident',
+          room_number: null,
+          profile_image_url: null,
+          is_active: false,
+          created_at: '2024-01-29T13:10:00Z',
+          updated_at: '2024-01-29T13:10:00Z',
+          building_id: null,
+          face_embedding: null
         }
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load students');
-      } finally {
-        setIsLoading(false);
-      }
+      ];
+      
+      console.log(`Loaded ${dummyStudents.length} dummy students`);
+      setStudents(dummyStudents);
+      setIsLoading(false);
     };
 
-    loadDataWithFallback();
-  }, []); // Only load once on mount
+    loadDummyData();
+  }, []);
 
   // Filter students instantly when search term or filter changes
   useEffect(() => {
@@ -299,50 +505,113 @@ export function StudentsPage() {
     calculateStats();
   }, [calculateStats]);
 
-  // Realtime subscription to students table
-  useEffect(() => {
-    const channel = subscribeToStudents((payload: RealtimePostgresChangesPayload<DbStudent>) => {
-      const event = payload.eventType;
-      if (event === 'INSERT') {
-        const newStudent = payload.new as DbStudent;
-        setStudents(prev => [newStudent, ...prev]);
-      } else if (event === 'UPDATE') {
-        const updated = payload.new as DbStudent;
-        setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
-      } else if (event === 'DELETE') {
-        const removed = payload.old as DbStudent;
-        setStudents(prev => prev.filter(s => s.id !== removed.id));
+  // Realtime subscription disabled for dummy data
+  // useEffect(() => {
+  //   const channel = subscribeToStudents((payload: RealtimePostgresChangesPayload<DbStudent>) => {
+  //     const event = payload.eventType;
+  //     if (event === 'INSERT') {
+  //       const newStudent = payload.new as DbStudent;
+  //       setStudents(prev => [newStudent, ...prev]);
+  //     } else if (event === 'UPDATE') {
+  //       const updated = payload.new as DbStudent;
+  //       setStudents(prev => prev.map(s => s.id === updated.id ? updated : s));
+  //     } else if (event === 'DELETE') {
+  //       const removed = payload.old as DbStudent;
+  //       setStudents(prev => prev.filter(s => s.id !== removed.id));
+  //     }
+  //   });
+
+  //   return () => {
+  //     channel?.unsubscribe();
+  //   };
+  // }, []);
+
+  const loadData = () => {
+    setIsLoading(true);
+    setError(null);
+    
+    // Dummy student data matching your database format
+    const dummyStudents: DbStudent[] = [
+      {
+        id: '1',
+        register_number: '99220041984',
+        full_name: 'TUMMALA HARSHA VARDHAN',
+        email: 'harshavardhantummala89@gmail.com',
+        phone: '+91 7989418258',
+        hostel_status: 'resident',
+        room_number: 'A101',
+        profile_image_url: null,
+        is_active: true,
+        created_at: '2024-01-15T10:30:00Z',
+        updated_at: '2024-01-15T10:30:00Z',
+        building_id: null,
+        face_embedding: null
+      },
+      {
+        id: '2',
+        register_number: '9922005300',
+        full_name: 'KAYAKOKULA NAVEEN',
+        email: 'naveenkayakokula@gmail.com',
+        phone: '+91 9876543210',
+        hostel_status: 'resident',
+        room_number: 'A102',
+        profile_image_url: null,
+        is_active: true,
+        created_at: '2024-01-16T09:15:00Z',
+        updated_at: '2024-01-16T09:15:00Z',
+        building_id: null,
+        face_embedding: null
+      },
+      {
+        id: '3',
+        register_number: '99220040074',
+        full_name: 'JASTHI JASWANTH',
+        email: 'jasthijaswanth87@gmail.com',
+        phone: '+91 8765432109',
+        hostel_status: 'day_scholar',
+        room_number: null,
+        profile_image_url: null,
+        is_active: true,
+        created_at: '2024-01-17T14:20:00Z',
+        updated_at: '2024-01-17T14:20:00Z',
+        building_id: null,
+        face_embedding: null
+      },
+      {
+        id: '4',
+        register_number: '99220040075',
+        full_name: 'KUNAL RAJ',
+        email: 'kunalrajsingh348@gmail.com',
+        phone: '+91 7654321098',
+        hostel_status: 'resident',
+        room_number: 'B201',
+        profile_image_url: null,
+        is_active: true,
+        created_at: '2024-01-18T11:45:00Z',
+        updated_at: '2024-01-18T11:45:00Z',
+        building_id: null,
+        face_embedding: null
+      },
+      {
+        id: '5',
+        register_number: '99220040076',
+        full_name: 'ATLURI TANUJA',
+        email: 'atluritanuja288@gmail.com',
+        phone: '+91 6543210987',
+        hostel_status: 'resident',
+        room_number: 'A103',
+        profile_image_url: null,
+        is_active: true,
+        created_at: '2024-01-19T16:30:00Z',
+        updated_at: '2024-01-19T16:30:00Z',
+        building_id: null,
+        face_embedding: null
       }
-    });
-
-    return () => {
-      channel?.unsubscribe();
-    };
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const timeoutMs = 10000;
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Connection to Supabase timed out (10s). Check policies/env and try again.')), timeoutMs)
-      );
-
-      const result = await Promise.race([
-        studentService.getAllStudents(),
-        timeoutPromise
-      ]);
-      
-      console.log(`Loaded ${result.length} students from database`);
-      setStudents(result);
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load students');
-    } finally {
-      setIsLoading(false);
-    }
+    ];
+    
+    console.log(`Loaded ${dummyStudents.length} dummy students`);
+    setStudents(dummyStudents);
+    setIsLoading(false);
   };
 
   const resetAddForm = () => {
@@ -422,152 +691,107 @@ export function StudentsPage() {
     loadBuildingsAndRooms();
   };
 
-  const allocateRoom = async () => {
+  const allocateRoom = () => {
     if (!selectedStudent || !selectedRoom) {
       toast.error('Please select a room');
       return;
     }
 
-    try {
-      console.log('Allocating room:', selectedRoom, 'to student:', selectedStudent.id);
-      
-      // Check if selectedRoom is a room ID (from API) or a manual room number
-      const isManualRoomNumber = availableRooms.length === 0 || !availableRooms.find(r => r.id === selectedRoom);
-      
-      if (isManualRoomNumber) {
-        // Manual room assignment - directly update student
-        console.log('Using manual room assignment');
-        await studentService.updateStudent(selectedStudent.id, {
-          room_number: selectedRoom
-        });
-        toast.success('Room allocated successfully (manual)');
-      } else {
-        // API-based room allocation
-        console.log('Using API-based room allocation');
-        const response = await roomApi.allotRoom({
-          room_id: selectedRoom,
-          student_id: selectedStudent.id,
-          notes: `Room allocated from Students Page`
-        });
+    // Update student's room number in dummy data
+    setStudents(prev => 
+      prev.map(student => 
+        student.id === selectedStudent.id 
+          ? { ...student, room_number: selectedRoom, updated_at: new Date().toISOString() }
+          : student
+      )
+    );
 
-        if (response.success) {
-          // Update student's room number
-          const selectedRoomData = availableRooms.find(r => r.id === selectedRoom);
-          if (selectedRoomData) {
-            await studentService.updateStudent(selectedStudent.id, {
-              room_number: selectedRoomData.room_number
-            });
-          }
-          toast.success('Room allocated successfully');
-        } else {
-          console.error('Room allocation API failed:', response.error);
-          toast.error(response.error || 'Failed to allocate room');
-          return;
-        }
-      }
-
-      setIsRoomAllocationOpen(false);
-      setSelectedRoom('');
-      setSelectedBuilding('all');
-      loadData(); // Refresh student data
-    } catch (error) {
-      console.error('Error allocating room:', error);
-      toast.error('Failed to allocate room: ' + (error instanceof Error ? error.message : 'Unknown error'));
-    }
+    toast.success('Room allocated successfully');
+    setIsRoomAllocationOpen(false);
+    setSelectedRoom('');
+    setSelectedBuilding('all');
   };
 
-  const deallocateRoom = async (student: DbStudent) => {
+  const deallocateRoom = (student: DbStudent) => {
     if (!student.room_number) {
       toast.error('Student does not have a room assigned');
       return;
     }
 
-    try {
-      // Update student to remove room
-      await studentService.updateStudent(student.id, {
-        room_number: null
-      });
+    // Update student to remove room in dummy data
+    setStudents(prev => 
+      prev.map(s => 
+        s.id === student.id 
+          ? { ...s, room_number: null, updated_at: new Date().toISOString() }
+          : s
+      )
+    );
 
-      toast.success('Room deallocated successfully');
-      loadData(); // Refresh student data
-    } catch (error) {
-      console.error('Error deallocating room:', error);
-      toast.error('Failed to deallocate room');
-    }
+    toast.success('Room deallocated successfully');
   };
 
-  const onAddStudent = async () => {
-    try {
-      if (!formData.register_number || !formData.full_name) {
-        toast.error('Register number and full name are required');
-        return;
-      }
-
-      const newStudent = await studentService.createStudent({
-        register_number: formData.register_number,
-        full_name: formData.full_name,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        hostel_status: formData.hostel_status,
-        room_number: formData.room_number || null,
-        face_embedding: null,
-        profile_image_url: null,
-        is_active: formData.is_active,
-      });
-
-      setStudents(prev => [newStudent, ...prev]);
-      setIsAddDialogOpen(false);
-      resetAddForm();
-      toast.success('Student added successfully');
-    } catch (error) {
-      console.error('Error adding student:', error);
-      toast.error('Failed to add student');
+  const onAddStudent = () => {
+    if (!formData.register_number || !formData.full_name) {
+      toast.error('Register number and full name are required');
+      return;
     }
+
+    const newStudent: DbStudent = {
+      id: Date.now().toString(), // Generate a simple ID
+      register_number: formData.register_number,
+      full_name: formData.full_name,
+      email: formData.email || null,
+      phone: formData.phone || null,
+      hostel_status: formData.hostel_status,
+      room_number: formData.room_number || null,
+      face_embedding: null,
+      profile_image_url: null,
+      is_active: formData.is_active,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      building_id: null
+    };
+
+    setStudents(prev => [newStudent, ...prev]);
+    setIsAddDialogOpen(false);
+    resetAddForm();
+    toast.success('Student added successfully');
   };
 
-  const onEditStudent = async () => {
+  const onEditStudent = () => {
     if (!selectedStudent) return;
 
-    try {
-      if (!editFormData.full_name) {
-        toast.error('Full name is required');
-        return;
-      }
-
-      const updatedStudent = await studentService.updateStudent(selectedStudent.id, {
-        full_name: editFormData.full_name,
-        email: editFormData.email || null,
-        phone: editFormData.phone || null,
-        hostel_status: editFormData.hostel_status,
-        room_number: editFormData.room_number || null,
-        is_active: editFormData.is_active,
-      });
-
-      setStudents(prev => 
-        prev.map(student => 
-          student.id === selectedStudent.id ? updatedStudent : student
-        )
-      );
-      setIsEditDialogOpen(false);
-      setSelectedStudent(null);
-      toast.success('Student updated successfully');
-    } catch (error) {
-      console.error('Error updating student:', error);
-      toast.error('Failed to update student');
+    if (!editFormData.full_name) {
+      toast.error('Full name is required');
+      return;
     }
+
+    const updatedStudent: DbStudent = {
+      ...selectedStudent,
+      full_name: editFormData.full_name,
+      email: editFormData.email || null,
+      phone: editFormData.phone || null,
+      hostel_status: editFormData.hostel_status,
+      room_number: editFormData.room_number || null,
+      is_active: editFormData.is_active,
+      updated_at: new Date().toISOString()
+    };
+
+    setStudents(prev => 
+      prev.map(student => 
+        student.id === selectedStudent.id ? updatedStudent : student
+      )
+    );
+    setIsEditDialogOpen(false);
+    setSelectedStudent(null);
+    toast.success('Student updated successfully');
   };
 
-  const onDeleteStudent = async (student: DbStudent) => {
+  const onDeleteStudent = (student: DbStudent) => {
     if (!confirm(`Are you sure you want to delete ${student.full_name}?`)) return;
 
-    try {
-      await studentService.deleteStudent(student.id);
-      setStudents(prev => prev.filter(s => s.id !== student.id));
-      toast.success('Student deleted successfully');
-    } catch (error) {
-      console.error('Error deleting student:', error);
-      toast.error('Failed to delete student');
-    }
+    setStudents(prev => prev.filter(s => s.id !== student.id));
+    toast.success('Student deleted successfully');
   };
 
   const getStatusBadge = (student: DbStudent) => {
@@ -1301,22 +1525,6 @@ export function StudentsPage() {
                             <p>No students found</p>
                             {searchTerm || statusFilter !== 'all' ? (
                               <p className="text-sm">Try adjusting your search or filters</p>
-                            ) : students.length === 0 ? (
-                              <div className="space-y-2">
-                                <p className="text-sm">No students in database</p>
-                                <p className="text-xs text-red-600">
-                                  This might be due to RLS policies or empty database. 
-                                  Check Supabase console for data and policies.
-                                </p>
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  onClick={loadData}
-                                  className="mt-2"
-                                >
-                                  Refresh
-                                </Button>
-                              </div>
                             ) : (
                               <p className="text-sm">Start by adding your first student</p>
                             )}

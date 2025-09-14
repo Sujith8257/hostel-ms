@@ -9,11 +9,12 @@ export interface DbStudent {
   phone: string | null;
   hostel_status: 'resident' | 'day_scholar' | 'former_resident';
   room_number: string | null;
-  face_embedding: ArrayBuffer | null;
   profile_image_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  building_id: string | null;
+  face_embedding: any | null; // jsonb type
 }
 
 export interface DbEntryLog {
