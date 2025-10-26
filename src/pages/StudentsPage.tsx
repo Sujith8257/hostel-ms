@@ -354,28 +354,7 @@ export function StudentsPage() {
 
   // Load data on component mount
   useEffect(() => {
-    const loadDataWithFallback = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Load students from CSV file
-        const studentsData = await loadStudentsFromCsv();
-        
-        console.log(`Loaded ${studentsData.length} students from CSV`);
-        setStudents(studentsData);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('Error loading data from CSV:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load students data');
-        toast.error('Failed to load students data');
-        setStudents([]);
-        setIsLoading(false);
-        toast.info('Using demo data - API connection failed');
-      }
-    };
-
-    loadDataWithFallback();
+    loadData();
   }, []);
 
   // Filter students when search term or filter changes
@@ -393,13 +372,21 @@ export function StudentsPage() {
       setIsLoading(true);
       setError(null);
 
-      // Load students from CSV file
-      const studentsData = await loadStudentsFromCsv();
-      
-      console.log(`Loaded ${studentsData.length} students from CSV`);
-      setStudents(studentsData);
+      // Try to load students from Supabase database first
+      try {
+        const studentsData = await studentService.getStudents();
+        console.log(`Loaded ${studentsData.length} students from database`);
+        setStudents(studentsData);
+      } catch (dbError) {
+        console.error('Database connection failed, falling back to CSV:', dbError);
+        // Fallback to CSV if database fails
+        const studentsData = await loadStudentsFromCsv();
+        console.log(`Loaded ${studentsData.length} students from CSV`);
+        setStudents(studentsData);
+        toast.warning('Using CSV data - Database connection unavailable');
+      }
     } catch (err) {
-      console.error('Error loading data from CSV:', err);
+      console.error('Error loading data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load students data');
       toast.error('Failed to load students data');
       setStudents([]);
@@ -566,6 +553,18 @@ export function StudentsPage() {
         return;
       }
 
+      console.log('Adding student with data:', formData);
+      
+      // Check if register number already exists
+      const existingStudents = students.filter(s => 
+        s.register_number.toLowerCase() === formData.register_number.toLowerCase()
+      );
+      
+      if (existingStudents.length > 0) {
+        toast.error(`A student with register number "${formData.register_number}" already exists`);
+        return;
+      }
+      
       const newStudent = await studentService.createStudent({
         register_number: formData.register_number,
         full_name: formData.full_name,
@@ -578,13 +577,48 @@ export function StudentsPage() {
         is_active: formData.is_active,
       });
 
+      console.log('Student created successfully:', newStudent);
+
+      // Optionally update local state immediately
       setStudents(prev => [newStudent, ...prev]);
+      
+      // Reload data from database to ensure consistency
+      await loadData();
+      
       setIsAddDialogOpen(false);
       resetAddForm();
       toast.success('Student added successfully');
     } catch (error) {
       console.error('Error adding student:', error);
-      toast.error('Failed to add student');
+      
+      // Check if error has expected properties
+      const errorObj = error as { code?: string; message?: string; details?: string; hint?: string };
+      
+      console.error('Error details:', {
+        message: errorObj?.message,
+        code: errorObj?.code,
+        details: errorObj?.details,
+        hint: errorObj?.hint,
+        error: error
+      });
+      
+      // Provide better error messages based on error type
+      let errorMessage = 'Failed to add student';
+      if (errorObj?.code === '23505' || errorObj?.code === 'P2002') {
+        // Unique constraint violation
+        errorMessage = `A student with register number "${formData.register_number}" already exists. Please use a different register number.`;
+      } else if (errorObj?.code === '42501' || errorObj?.message?.includes('permission denied')) {
+        // Permission denied
+        errorMessage = 'Permission denied. You may need to adjust Row Level Security (RLS) policies on the students table.';
+      } else if (errorObj?.message) {
+        errorMessage = errorObj.message;
+      } else if (errorObj?.details) {
+        errorMessage = errorObj.details;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -611,12 +645,16 @@ export function StudentsPage() {
           student.id === selectedStudent.id ? updatedStudent : student
         )
       );
+      
+      // Reload data from database to ensure consistency
+      await loadData();
+      
       setIsEditDialogOpen(false);
       setSelectedStudent(null);
       toast.success('Student updated successfully');
     } catch (error) {
       console.error('Error updating student:', error);
-      toast.error('Failed to update student');
+      toast.error('Failed to update student: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -625,11 +663,17 @@ export function StudentsPage() {
 
     try {
       await studentService.deleteStudent(student.id);
+      
+      // Optionally update local state immediately
       setStudents(prev => prev.filter(s => s.id !== student.id));
+      
+      // Reload data from database to ensure consistency
+      await loadData();
+      
       toast.success('Student deleted successfully');
     } catch (error) {
       console.error('Error deleting student:', error);
-      toast.error('Failed to delete student');
+      toast.error('Failed to delete student: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 

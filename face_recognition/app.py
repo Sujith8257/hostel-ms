@@ -584,7 +584,10 @@ DASHBOARD_HTML = """
                 <!-- Student Search -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Search Students:</label>
-                    <input type="text" id="studentSearch" class="form-input" placeholder="Search by name or register number..." onkeyup="filterStudents()">
+                    <div class="flex gap-2">
+                        <input type="text" id="studentSearch" class="form-input flex-1" placeholder="Search by name or register number..." onkeyup="debounceFilterStudents()">
+                        <button onclick="clearSearch()" class="btn-secondary" title="Clear search">Clear</button>
+                    </div>
                 </div>
 
                 <!-- Student List -->
@@ -729,14 +732,98 @@ DASHBOARD_HTML = """
             `).join('');
         }
 
-        // Filter students based on search
-        function filterStudents() {
-            const searchTerm = document.getElementById('studentSearch').value.toLowerCase();
-            const filtered = allStudents.filter(student => 
-                student.full_name.toLowerCase().includes(searchTerm) ||
-                student.register_number.toLowerCase().includes(searchTerm)
-            );
-            displayStudents(filtered);
+        // Debounce timer for search
+        let filterTimeout = null;
+
+        // Debounced filter function to avoid excessive filtering
+        function debounceFilterStudents() {
+            if (filterTimeout) {
+                clearTimeout(filterTimeout);
+            }
+            filterTimeout = setTimeout(() => {
+                filterStudents();
+            }, 500); // Wait 500ms after typing stops for better performance
+        }
+
+        // Clear search and show all students
+        function clearSearch() {
+            const searchInput = document.getElementById('studentSearch');
+            if (searchInput) {
+                searchInput.value = '';
+                // Reload all students
+                loadStudents();
+                console.log('Search cleared, loading all students');
+            }
+        }
+
+        // Filter students based on search (using backend API)
+        async function filterStudents() {
+            const studentList = document.getElementById('studentList');
+            const searchInput = document.getElementById('studentSearch');
+            
+            if (!searchInput) {
+                console.error('Search input element not found');
+                return;
+            }
+            
+            const searchTerm = (searchInput.value || '').trim();
+            
+            // Show loading state
+            if (studentList) {
+                studentList.innerHTML = '<div class="text-center text-muted-foreground">Searching...</div>';
+            }
+            
+            // If search term is empty, show all students
+            if (searchTerm === '') {
+                await loadStudents();
+                return;
+            }
+            
+            console.log(`🔍 Searching for: "${searchTerm}"`);
+            addLog(`Searching for "${searchTerm}"...`, 'info');
+            
+            try {
+                // Call backend search API
+                const response = await fetch(`/api/students?search=${encodeURIComponent(searchTerm)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Search API response:', data);
+                
+                if (data.success) {
+                    console.log(`✅ Found ${data.count} students matching "${searchTerm}"`);
+                    allStudents = data.students || [];
+                    displayStudents(allStudents);
+                    addLog(`Found ${data.count} student(s) matching "${searchTerm}"`, 'success');
+                } else {
+                    console.error('Search failed:', data.error);
+                    addLog('Search failed: ' + (data.error || 'Unknown error'), 'error');
+                    if (studentList) {
+                        studentList.innerHTML = '<div class="text-center text-muted-foreground">No students found</div>';
+                    }
+                }
+            } catch (apiError) {
+                console.error('API search failed, using fallback:', apiError);
+                addLog('Search API failed, using local filter', 'warning');
+                
+                // Fallback to client-side filtering
+                const filtered = allStudents.filter(student => 
+                    (student.full_name && student.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (student.register_number && student.register_number.toLowerCase().includes(searchTerm.toLowerCase()))
+                );
+                
+                console.log(`Filtering ${allStudents.length} students locally, found ${filtered.length} matches for "${searchTerm}"`);
+                displayStudents(filtered);
+                
+                if (filtered.length === 0) {
+                    addLog(`No students found matching "${searchTerm}"`, 'warning');
+                } else {
+                    addLog(`Found ${filtered.length} student(s) matching "${searchTerm}" (local filter)`, 'success');
+                }
+            }
         }
 
         // Select a student
@@ -1142,8 +1229,8 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         # Calculate similarity
         cosine_dist = cosine(stored_embedding, embedding)
         raw_similarity = 1 - cosine_dist
-        similarity = raw_similarity + 0.125  # Adjustment as in original code
-        threshold = 0.5
+        similarity = raw_similarity  # Adjustment as in original code
+        threshold = 0.75
         success = bool(similarity > threshold)
         
         print(f"🔐 Authentication comparison for {register_number}:")
@@ -1507,7 +1594,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         
         best_match = None
         best_similarity = 0.0
-        recognition_threshold = 0.5  # Threshold for face recognition
+        recognition_threshold = 0.75 # Threshold for face recognition
         
         print(f"🔍 Starting face recognition comparison...")
         print(f"   Query embedding shape: {embedding.shape}")
@@ -1566,7 +1653,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 # Calculate similarity
                 cosine_dist = cosine(stored_embedding, embedding)
                 similarity = 1 - cosine_dist
-                adjusted_similarity = similarity + 0.125  # Adjustment as in original code
+                adjusted_similarity = similarity  # Adjustment as in original code
                 
                 print(f"   Similarity calculation:")
                 print(f"     Cosine distance: {cosine_dist:.6f}")
@@ -1781,17 +1868,109 @@ async def test_embedding():
         }
 
 @app.get("/api/students")
-async def get_students_endpoint():
-    """Get all students from Supabase"""
+async def get_students_endpoint(search: Optional[str] = None):
+    """Get all students from Supabase, optionally filtered by search term"""
     try:
-        students = get_all_students_including_no_face(limit=2000)
+        if search and search.strip():
+            # Search with filters
+            search_term = search.strip().lower()
+            print(f"🔍 Searching for students matching: '{search_term}'")
+            
+            # Query Supabase with search filters using proper syntax
+            result = (
+                supabase.table('students')
+                .select('*')
+                .eq('is_active', True)
+                .or_(f"full_name.ilike.%{search_term}%,register_number.ilike.%{search_term}%")
+                .limit(2000)
+                .execute()
+            )
+            
+            students = result.data if result.data else []
+            print(f"✅ Found {len(students)} students matching '{search_term}'")
+        else:
+            # Get all students
+            students = get_all_students_including_no_face(limit=2000)
+            print(f"📋 Retrieved all {len(students)} students")
+        
         return {
             "success": True,
             "students": students,
-            "count": len(students)
+            "count": len(students),
+            "search_term": search if search else None
         }
     except Exception as e:
+        print(f"❌ Error fetching students: {e}")
+        # Fallback: try client-side filtering if server search fails
+        if search and search.strip():
+            print("⚠️ Server-side search failed, falling back to client-side filtering")
+            try:
+                all_students = get_all_students_including_no_face(limit=2000)
+                search_term = search.strip().lower()
+                students = [
+                    s for s in all_students 
+                    if (s.get('full_name', '').lower().find(search_term) != -1 or 
+                        s.get('register_number', '').lower().find(search_term) != -1)
+                ]
+                print(f"✅ Client-side filter found {len(students)} students")
+                return {
+                    "success": True,
+                    "students": students,
+                    "count": len(students),
+                    "search_term": search
+                }
+            except Exception as fallback_error:
+                print(f"❌ Fallback also failed: {fallback_error}")
+        
         raise HTTPException(status_code=500, detail=f"Failed to fetch students: {str(e)}")
+
+@app.get("/api/students/search")
+async def search_students_endpoint(query: str):
+    """Search students by name or register number (dedicated search endpoint)"""
+    try:
+        if not query or not query.strip():
+            return {
+                "success": False,
+                "error": "Search query is required",
+                "students": [],
+                "count": 0
+            }
+        
+        search_term = query.strip()
+        print(f"🔍 Searching for: '{search_term}'")
+        
+        # First try Supabase query
+        try:
+            result = (
+                supabase.table('students')
+                .select('*')
+                .eq('is_active', True)
+                .or_(f"full_name.ilike.%{search_term}%,register_number.ilike.%{search_term}%")
+                .limit(2000)
+                .execute()
+            )
+            students = result.data if result.data else []
+            print(f"✅ Supabase query found {len(students)} students")
+        except Exception as db_error:
+            print(f"⚠️ Supabase query failed, using client-side filter: {db_error}")
+            # Fallback to client-side filtering
+            all_students = get_all_students_including_no_face(limit=2000)
+            students = [
+                s for s in all_students 
+                if search_term in s.get('full_name', '').lower() or 
+                   search_term in s.get('register_number', '').lower()
+            ]
+            print(f"✅ Client-side filter found {len(students)} students")
+        
+        return {
+            "success": True,
+            "students": students,
+            "count": len(students),
+            "query": search_term
+        }
+    except Exception as e:
+        print(f"❌ Error searching students: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.get("/api/stats")
 async def get_dashboard_stats():
@@ -1845,11 +2024,37 @@ async def get_attendance_today():
         raise HTTPException(status_code=500, detail=f"Failed to get today's attendance: {str(e)}")
 
 @app.get("/debug/students")
-async def debug_students():
+async def debug_students(register_number: Optional[str] = None):
     """Debug endpoint to check student data in database"""
     try:
         print("🔍 Debug: Checking student data...")
-        students = get_all_students_including_no_face(limit=10)
+        
+        if register_number:
+            # Search for specific register number
+            print(f"🔍 Searching for register number: {register_number}")
+            result = (
+                supabase.table('students')
+                .select('*')
+                .eq('register_number', register_number)
+                .execute()
+            )
+            students = result.data if result.data else []
+            print(f"✅ Found {len(students)} students with register number '{register_number}'")
+            if students:
+                for student in students:
+                    print(f"   - {student.get('full_name')} ({student.get('register_number')}) - Active: {student.get('is_active')}")
+            else:
+                print(f"❌ No students found with register number '{register_number}'")
+                # Try to find similar
+                all_students = get_all_students_including_no_face(limit=2000)
+                similar = [s for s in all_students if register_number in s.get('register_number', '')]
+                if similar:
+                    print(f"   Found {len(similar)} similar register numbers:")
+                    for s in similar[:5]:
+                        print(f"   - {s.get('register_number')} ({s.get('full_name')})")
+        else:
+            # Get all students
+            students = get_all_students_including_no_face(limit=10)
         
         debug_info = {
             "total_students": len(students),

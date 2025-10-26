@@ -71,6 +71,7 @@ export const studentService = {
         phone: student.phone,
         hostel_status: student.hostel_status,
         room_number: student.room_number,
+        face_embedding: student.face_embedding,
         profile_image_url: student.profile_image_url,
         is_active: student.is_active
       }])
@@ -90,6 +91,7 @@ export const studentService = {
         phone: updates.phone,
         hostel_status: updates.hostel_status,
         room_number: updates.room_number,
+        face_embedding: updates.face_embedding,
         profile_image_url: updates.profile_image_url,
         is_active: updates.is_active
       })
