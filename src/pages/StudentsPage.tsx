@@ -37,14 +37,19 @@ import {
   LogOut,
   BarChart3,
   HelpCircle,
-  Building2
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { studentService } from '@/lib/services';
 import { roomApi, adminApi } from '@/api/client';
 import type { DbStudent } from '@/types/database-models';
 import { toast } from 'sonner';
+import studentsCsvUrl from '/students.csv?url';
 
 interface StudentFormData {
   register_number: string;
@@ -89,9 +94,82 @@ interface StudentStats {
   faceNotEnrolled: number;
 }
 
+// CSV parsing function
+const parseCSVLine = (line: string): string[] => {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current.trim());
+  return result;
+};
+
+const loadStudentsFromCsv = async (): Promise<DbStudent[]> => {
+  try {
+    const response = await fetch(studentsCsvUrl);
+    if (!response.ok) {
+      throw new Error(`CSV fetch failed with status ${response.status}`);
+    }
+    
+    const text = await response.text();
+    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
+    
+    if (lines.length <= 1) {
+      return [];
+    }
+    
+    // Parse header
+    const header = parseCSVLine(lines[0]);
+    const colIndex = (name: string) => header.indexOf(name);
+    
+    const students: DbStudent[] = [];
+    
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      if (cols.length < header.length) {
+        continue;
+      }
+      
+      const student: DbStudent = {
+        id: crypto.randomUUID(), // Generate ID since CSV doesn't have one
+        register_number: cols[colIndex('Reg.No.')] || '',
+        full_name: cols[colIndex('Name of the Student')] || '',
+        email: cols[colIndex('Email ID')] || '',
+        phone: '', // CSV doesn't have phone, will be empty
+        hostel_status: 'resident', // Default to resident, can be updated later
+        room_number: '', // CSV doesn't have room info, will be empty
+        is_active: true, // Default to active
+        face_embedding: null, // No face data in CSV
+        profile_image_url: null, // No profile image in CSV
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      students.push(student);
+    }
+    
+    return students;
+  } catch (error) {
+    console.error('Error loading students from CSV:', error);
+    throw error;
+  }
+};
+
 export function StudentsPage() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
@@ -127,6 +205,11 @@ export function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
   
   // Room allocation states
   const [isRoomAllocationOpen, setIsRoomAllocationOpen] = useState(false);
@@ -240,7 +323,34 @@ export function StudentsPage() {
     }
 
     setFilteredStudents(filtered);
-  }, [students, searchTerm, statusFilter]);
+    
+    // Calculate total pages based on filtered results
+    const total = Math.ceil(filtered.length / pageSize);
+    setTotalPages(total);
+    
+    // Reset to first page if current page is beyond total pages
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+  }, [students, searchTerm, statusFilter, pageSize, currentPage]);
+
+  // Get paginated students
+  const getPaginatedStudents = useCallback(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredStudents.slice(startIndex, endIndex);
+  }, [filteredStudents, currentPage, pageSize]);
+
+  // Handle page size change
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   // Load data on component mount
   useEffect(() => {
@@ -249,70 +359,17 @@ export function StudentsPage() {
         setIsLoading(true);
         setError(null);
 
-        // Try to load from API with timeout
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 3000)
-        );
+        // Load students from CSV file
+        const studentsData = await loadStudentsFromCsv();
         
-        const studentsData = await Promise.race([
-          studentService.getStudents(),
-          timeoutPromise
-        ]) as DbStudent[];
-        
-        console.log(`Loaded ${studentsData.length} students from database`);
+        console.log(`Loaded ${studentsData.length} students from CSV`);
         setStudents(studentsData);
         setIsLoading(false);
       } catch (err) {
-        console.error('Error loading data:', err);
-        
-        // Fallback to mock data if API fails
-        console.log('Using fallback mock data');
-        const mockStudents: DbStudent[] = [
-          {
-            id: '1',
-            register_number: 'REG001',
-            full_name: 'John Doe',
-            email: 'john.doe@example.com',
-            phone: '+1234567890',
-            hostel_status: 'resident',
-            room_number: 'A-101',
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            register_number: 'REG002',
-            full_name: 'Jane Smith',
-            email: 'jane.smith@example.com',
-            phone: '+1234567891',
-            hostel_status: 'day_scholar',
-            room_number: null,
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '3',
-            register_number: 'REG003',
-            full_name: 'Bob Johnson',
-            email: 'bob.johnson@example.com',
-            phone: '+1234567892',
-            hostel_status: 'resident',
-            room_number: 'B-205',
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-        
-        setStudents(mockStudents);
+        console.error('Error loading data from CSV:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load students data');
+        toast.error('Failed to load students data');
+        setStudents([]);
         setIsLoading(false);
         toast.info('Using demo data - API connection failed');
       }
@@ -336,70 +393,16 @@ export function StudentsPage() {
       setIsLoading(true);
       setError(null);
 
-      // Try to load from API with timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 5000)
-      );
+      // Load students from CSV file
+      const studentsData = await loadStudentsFromCsv();
       
-      const studentsData = await Promise.race([
-        studentService.getStudents(),
-        timeoutPromise
-      ]) as DbStudent[];
-      
-      console.log(`Loaded ${studentsData.length} students from database`);
+      console.log(`Loaded ${studentsData.length} students from CSV`);
       setStudents(studentsData);
     } catch (err) {
-      console.error('Error loading data:', err);
-      
-      // Fallback to mock data if API fails
-      console.log('Using fallback mock data');
-      const mockStudents: DbStudent[] = [
-        {
-          id: '1',
-          register_number: 'REG001',
-          full_name: 'John Doe',
-          email: 'john.doe@example.com',
-          phone: '+1234567890',
-          hostel_status: 'resident',
-          room_number: 'A-101',
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          register_number: 'REG002',
-          full_name: 'Jane Smith',
-          email: 'jane.smith@example.com',
-          phone: '+1234567891',
-          hostel_status: 'day_scholar',
-          room_number: null,
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          register_number: 'REG003',
-          full_name: 'Bob Johnson',
-          email: 'bob.johnson@example.com',
-          phone: '+1234567892',
-          hostel_status: 'resident',
-          room_number: 'B-205',
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      setStudents(mockStudents);
-      toast.info('Using demo data - API connection failed');
+      console.error('Error loading data from CSV:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load students data');
+      toast.error('Failed to load students data');
+      setStudents([]);
     } finally {
       setIsLoading(false);
     }
@@ -1330,13 +1333,33 @@ export function StudentsPage() {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Students ({filteredStudents.length})</CardTitle>
-              <CardDescription>
-                {filteredStudents.length === students.length 
-                  ? 'All students in the system'
-                  : `Filtered from ${students.length} total students`
-                }
-              </CardDescription>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <CardTitle>Students ({filteredStudents.length})</CardTitle>
+                  <CardDescription>
+                    {filteredStudents.length === students.length 
+                      ? 'All students in the system'
+                      : `Filtered from ${students.length} total students`
+                    }
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Show:</span>
+                  <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(Number(value))}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">per page</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -1368,7 +1391,7 @@ export function StudentsPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStudents.map((student) => (
+                      getPaginatedStudents().map((student) => (
                         <TableRow key={student.id}>
                           <TableCell>
                             <div>
@@ -1502,6 +1525,77 @@ export function StudentsPage() {
                 </Table>
               </div>
             </CardContent>
+            
+            {/* Pagination Controls */}
+            {filteredStudents.length > 0 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredStudents.length)} of {filteredStudents.length} students
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </motion.div>
 
