@@ -319,7 +319,6 @@ def get_student_by_register_number(register_number: str) -> Optional[Dict]:
 # Preprocess face
 # ------------------------------
 def preprocess_face(image):
-    """Extract face from image and return face data with bounding box"""
     with mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5) as face_detection:
         results = face_detection.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         if not results.detections:
@@ -331,15 +330,9 @@ def preprocess_face(image):
         face = image[y1:y2, x1:x2]
         if face.size == 0:
             return None
-        face_resized = cv2.resize(face, (112, 112))
-        face_normalized = face_resized.astype("float32") / 127.5 - 1.0
-        
-        # Return face data with bounding box info
-        return {
-            'face': np.expand_dims(face_normalized, axis=0),
-            'bbox': (x1, y1, x2, y2),
-            'detection': results.detections[0]
-        }
+        face = cv2.resize(face, (112, 112))
+        face = face.astype("float32") / 127.5 - 1.0
+        return np.expand_dims(face, axis=0)
 
 # ------------------------------
 # Get embedding
@@ -952,15 +945,6 @@ DASHBOARD_HTML = """
                     statusDiv.textContent = `✅ Welcome ${result.student.full_name}!`;
                     detailsDiv.textContent = `${result.confidence_percentage}% match • Entry logged at ${result.location}`;
                     
-                    // Update captured image with annotated image if available
-                    if (result.annotated_image) {
-                        const capturedImg = document.getElementById('capturedImage');
-                        if (capturedImg) {
-                            capturedImg.src = result.annotated_image;
-                            console.log('✅ Displaying annotated image with bounding box and registration number');
-                        }
-                    }
-                    
                     addLog(`🎉 Welcome ${result.student.full_name}! (${result.confidence_percentage}% match)`, 'success');
                     addLog(`Entry logged at ${result.location}`, 'success');
                     loadStats(); // Refresh stats
@@ -1143,11 +1127,11 @@ async def register_from_dashboard(register_number: str = Form(...), file: Upload
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face_data = preprocess_face(image)
-        if face_data is None:
+        face = preprocess_face(image)
+        if face is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
-        embedding = get_embedding(face_data['face'])
+        embedding = get_embedding(face)
         
         # Save to Supabase
         success = save_embedding_to_supabase(register_number, embedding)
@@ -1174,11 +1158,11 @@ async def register(register_number: str = Form(...), full_name: str = Form(None)
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face_data = preprocess_face(image)
-        if face_data is None:
+        face = preprocess_face(image)
+        if face is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
-        embedding = get_embedding(face_data['face'])
+        embedding = get_embedding(face)
         
         # Save to Supabase
         success = save_embedding_to_supabase(register_number, embedding, full_name)
@@ -1231,11 +1215,11 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face_data = preprocess_face(image)
-        if face_data is None:
+        face = preprocess_face(image)
+        if face is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
-        embedding = get_embedding(face_data['face'])
+        embedding = get_embedding(face)
         
         # Get stored embedding from Supabase
         stored_embedding = get_embedding_from_supabase(register_number)
@@ -1424,15 +1408,12 @@ async def process_face(file: UploadFile = File(...)):
                     })
             
             # Preprocess face for embedding
-            face_data = preprocess_face(image)
-            if face_data is None:
+            face = preprocess_face(image)
+            if face is None:
                 raise HTTPException(status_code=400, detail="Failed to preprocess face")
             
             # Get embedding
-            embedding = get_embedding(face_data['face'])
-            
-            # Extract bounding box coordinates
-            x1, y1, x2, y2 = face_data['bbox']
+            embedding = get_embedding(face)
             
             # Create face detection points for visualization
             face_points = []
@@ -1546,19 +1527,15 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face_data = preprocess_face(image)
-        if face_data is None:
+        face = preprocess_face(image)
+        if face is None:
             return {
                 "success": False,
                 "message": "No face detected in the image",
                 "face_detected": False
             }
-        
-        # Extract face and bounding box
-        face_processed = face_data['face']
-        bbox = face_data['bbox']
-        
-        embedding = get_embedding(face_processed)
+
+        embedding = get_embedding(face)
         
         # Get all students with face embeddings (filter at database level)
         students = get_all_students(limit=2000)
@@ -1708,39 +1685,6 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
             print(f"   Confidence: {round(best_similarity * 100, 1)}%")
             print(f"   Location: {location}")
             
-            # Draw bounding box and register number on image
-            annotated_image = image.copy()
-            x1, y1, x2, y2 = bbox
-            
-            # Draw bounding box
-            cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0, 255, 0), 3)
-            
-            # Add text background for better readability
-            text = best_match['register_number']
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.8
-            thickness = 2
-            (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-            
-            # Calculate text position (above bounding box)
-            text_x = x1
-            text_y = max(y1 - 10, text_height + 10)  # 10px above bbox, or top + padding
-            
-            # Draw filled rectangle for text background
-            cv2.rectangle(annotated_image, 
-                         (text_x - 5, text_y - text_height - 5), 
-                         (text_x + text_width + 5, text_y + baseline + 5), 
-                         (0, 255, 0), -1)
-            
-            # Draw text in white
-            cv2.putText(annotated_image, text, (text_x, text_y), 
-                       font, font_scale, (255, 255, 255), thickness)
-            
-            # Convert annotated image to base64 for sending to frontend
-            _, buffer = cv2.imencode('.jpg', annotated_image, [cv2.IMWRITE_JPEG_QUALITY, 95])
-            annotated_image_bytes = buffer.tobytes()
-            annotated_image_base64 = base64.b64encode(annotated_image_bytes).decode('utf-8')
-            
             # Log entry for recognized student
             entry_logged = log_entry(
                 register_number=best_match['register_number'],
@@ -1771,8 +1715,6 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "location": location,
                 "entry_logged": entry_logged,
                 "attendance_logged": attendance_logged,
-                "annotated_image": f"data:image/jpeg;base64,{annotated_image_base64}",
-                "bbox": bbox,
                 "message": f"Welcome {best_match['full_name']}! Entry logged successfully."
             }
         else:

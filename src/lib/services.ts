@@ -5,49 +5,141 @@ import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 // Student Management
 export const studentService = {
-  async getStudents(): Promise<DbStudent[]> {
-    // Try with a very high limit first
-    const { data, error } = await supabase
-      .from('students')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50000); // Set a very high limit
+  async getStudents(retries: number = 1): Promise<DbStudent[]> {
+    const startTime = Date.now();
+    console.log('📡 [GET_STUDENTS] Starting fetch (RLS disabled, using direct query)...');
     
-    if (error) throw error;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
     
-    // If we got exactly 1000 results, it means we might be hitting a limit
-    // In that case, fall back to pagination
-    if (data && data.length === 1000) {
-      console.warn('Potential limit reached, using pagination...');
-      
-      // Use pagination to fetch all students
-      let allStudents: DbStudent[] = [...data]; // Start with what we already have
-      let start = 1000;
-      const batchSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data: nextBatch, error: nextError } = await supabase
-          .from('students')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(start, start + batchSize - 1);
-        
-        if (nextError) throw nextError;
-        
-        if (nextBatch && nextBatch.length > 0) {
-          allStudents = allStudents.concat(nextBatch);
-          start += batchSize;
-          hasMore = nextBatch.length === batchSize;
-        } else {
-          hasMore = false;
-        }
+    console.log('📡 [GET_STUDENTS] Using REST API directly...');
+    
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      if (attempt > 0) {
+        const delay = 2000;
+        console.log(`🔄 [GET_STUDENTS] Retry ${attempt}/${retries} after ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
       }
       
-      return allStudents;
+      console.log(`📡 [GET_STUDENTS] Attempt ${attempt + 1}/${retries + 1}...`);
+      const attemptStart = Date.now();
+      
+      try {
+        // Fetch all students using pagination (Supabase default limit is 1000)
+        const batchSize = 1000;
+        let allStudents: any[] = [];
+        let from = 0;
+        let hasMore = true;
+        let totalCount: number | null = null;
+        
+        console.log('📡 [GET_STUDENTS] Fetching all students with pagination...');
+        
+        while (hasMore) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout per batch
+          
+          const to = from + batchSize - 1;
+          const queryUrl = `${supabaseUrl}/rest/v1/students?select=id,register_number,full_name,email,phone,hostel_status,room_number,is_active,created_at,updated_at&order=created_at.desc&limit=${batchSize}&offset=${from}`;
+          
+          console.log(`📡 [GET_STUDENTS] Fetching batch: ${from} to ${to}...`);
+          
+          try {
+            const response = await fetch(queryUrl, {
+              method: 'GET',
+              headers: {
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'count=exact'
+              },
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            const batchTime = Date.now() - attemptStart;
+            console.log(`📡 [GET_STUDENTS] Batch response in ${batchTime}ms:`, response.status);
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('❌ [GET_STUDENTS] HTTP error:', response.status, errorText);
+              throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            // Get total count from header
+            const contentRange = response.headers.get('content-range');
+            if (contentRange && !totalCount) {
+              const match = contentRange.match(/\/(\d+)/);
+              if (match) {
+                totalCount = parseInt(match[1], 10);
+                console.log(`📊 [GET_STUDENTS] Total students in database: ${totalCount}`);
+              }
+            }
+            
+            const data = await response.json();
+            
+            if (!Array.isArray(data)) {
+              console.error('❌ [GET_STUDENTS] Invalid response format:', typeof data);
+              throw new Error('Invalid response: expected array');
+            }
+            
+            allStudents = [...allStudents, ...data];
+            console.log(`✅ [GET_STUDENTS] Batch: ${data.length} students (total so far: ${allStudents.length}/${totalCount || 'unknown'})`);
+            
+            // Check if we got all records
+            if (totalCount !== null && allStudents.length >= totalCount) {
+              hasMore = false;
+              console.log(`✅ [GET_STUDENTS] All ${totalCount} students fetched`);
+            } else if (data.length < batchSize) {
+              // If we got fewer than batchSize, we've reached the end
+              hasMore = false;
+              console.log(`✅ [GET_STUDENTS] Reached end of data (got ${data.length} < ${batchSize})`);
+            } else {
+              from += batchSize;
+            }
+          } catch (batchErr: any) {
+            clearTimeout(timeoutId);
+            if (batchErr.name === 'AbortError') {
+              console.error(`❌ [GET_STUDENTS] Batch timeout after 10s`);
+              throw new Error('Request timed out while fetching batch');
+            }
+            throw batchErr;
+          }
+        }
+        
+        const totalTime = Date.now() - startTime;
+        console.log(`✅ [GET_STUDENTS] Fetched ${allStudents.length} students in ${totalTime}ms`);
+        
+        // Convert to DbStudent format
+        const students: DbStudent[] = allStudents.map((student: any) => ({
+          ...student,
+          face_embedding: null,
+          profile_image_url: null
+        }));
+        
+        return students;
+        
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const attemptTime = Date.now() - attemptStart;
+        
+        if (err.name === 'AbortError') {
+          console.error(`❌ [GET_STUDENTS] Timeout after 8s (attempt ${attempt + 1})`);
+          lastError = new Error('Request timed out after 8 seconds');
+        } else {
+          console.error(`❌ [GET_STUDENTS] Error (attempt ${attempt + 1}, ${attemptTime}ms):`, err.message || err);
+        }
+        
+        if (attempt === retries) {
+          throw lastError;
+        }
+      }
     }
     
-    return data || [];
+    throw lastError || new Error('Failed to fetch students');
   },
 
   async getStudent(id: string): Promise<DbStudent> {
@@ -62,54 +154,165 @@ export const studentService = {
   },
 
   async createStudent(student: Omit<DbStudent, 'id' | 'created_at' | 'updated_at'>): Promise<DbStudent> {
-    const { data, error } = await supabase
-      .from('students')
-      .insert([{
-        register_number: student.register_number,
-        full_name: student.full_name,
-        email: student.email,
-        phone: student.phone,
-        hostel_status: student.hostel_status,
-        room_number: student.room_number,
-        face_embedding: student.face_embedding,
-        profile_image_url: student.profile_image_url,
-        is_active: student.is_active
-      }])
-      .select()
-      .single();
+    console.log('📝 [CREATE_STUDENT] Creating student:', student.register_number);
     
-    if (error) throw error;
-    return data;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/students`, {
+        method: 'POST',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          register_number: student.register_number,
+          full_name: student.full_name,
+          email: student.email,
+          phone: student.phone,
+          hostel_status: student.hostel_status,
+          room_number: student.room_number,
+          face_embedding: student.face_embedding,
+          profile_image_url: student.profile_image_url,
+          is_active: student.is_active
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('📝 [CREATE_STUDENT] Response:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [CREATE_STUDENT] HTTP error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Supabase returns array with single item when using return=representation
+      const newStudent = Array.isArray(data) ? data[0] : data;
+      
+      if (!newStudent) {
+        throw new Error('No student data returned from insert');
+      }
+      
+      console.log('✅ [CREATE_STUDENT] Student created:', newStudent.id);
+      
+      return {
+        ...newStudent,
+        face_embedding: newStudent.face_embedding || null,
+        profile_image_url: newStudent.profile_image_url || null
+      };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        console.error('❌ [CREATE_STUDENT] Timeout after 10s');
+        throw new Error('Request timed out while creating student');
+      }
+      console.error('❌ [CREATE_STUDENT] Error:', err);
+      throw err;
+    }
   },
 
   async updateStudent(id: string, updates: Partial<Omit<DbStudent, 'id' | 'created_at' | 'updated_at'>>): Promise<DbStudent> {
-    const { data, error } = await supabase
-      .from('students')
-      .update({
-        full_name: updates.full_name,
-        email: updates.email,
-        phone: updates.phone,
-        hostel_status: updates.hostel_status,
-        room_number: updates.room_number,
-        face_embedding: updates.face_embedding,
-        profile_image_url: updates.profile_image_url,
-        is_active: updates.is_active
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    console.log('✏️ [UPDATE_STUDENT] Updating student:', id);
     
-    if (error) throw error;
-    return data;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/students?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          full_name: updates.full_name,
+          email: updates.email,
+          phone: updates.phone,
+          hostel_status: updates.hostel_status,
+          room_number: updates.room_number,
+          face_embedding: updates.face_embedding,
+          profile_image_url: updates.profile_image_url,
+          is_active: updates.is_active
+        }),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      const updatedStudent = Array.isArray(data) ? data[0] : data;
+      
+      if (!updatedStudent) {
+        throw new Error('No student data returned from update');
+      }
+      
+      console.log('✅ [UPDATE_STUDENT] Student updated:', id);
+      return updatedStudent;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out while updating student');
+      }
+      throw err;
+    }
   },
 
   async deleteStudent(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('students')
-      .delete()
-      .eq('id', id);
+    console.log('🗑️ [DELETE_STUDENT] Deleting student:', id);
     
-    if (error) throw error;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/students?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json'
+        },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      console.log('✅ [DELETE_STUDENT] Student deleted:', id);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out while deleting student');
+      }
+      throw err;
+    }
   }
 };
 

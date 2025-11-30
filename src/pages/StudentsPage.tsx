@@ -49,7 +49,6 @@ import { studentService } from '@/lib/services';
 import { roomApi, adminApi } from '@/api/client';
 import type { DbStudent } from '@/types/database-models';
 import { toast } from 'sonner';
-import studentsCsvUrl from '/students.csv?url';
 
 interface StudentFormData {
   register_number: string;
@@ -94,79 +93,6 @@ interface StudentStats {
   faceNotEnrolled: number;
 }
 
-// CSV parsing function
-const parseCSVLine = (line: string): string[] => {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  
-  result.push(current.trim());
-  return result;
-};
-
-const loadStudentsFromCsv = async (): Promise<DbStudent[]> => {
-  try {
-    const response = await fetch(studentsCsvUrl);
-    if (!response.ok) {
-      throw new Error(`CSV fetch failed with status ${response.status}`);
-    }
-    
-    const text = await response.text();
-    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
-    
-    if (lines.length <= 1) {
-      return [];
-    }
-    
-    // Parse header
-    const header = parseCSVLine(lines[0]);
-    const colIndex = (name: string) => header.indexOf(name);
-    
-    const students: DbStudent[] = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const cols = parseCSVLine(lines[i]);
-      if (cols.length < header.length) {
-        continue;
-      }
-      
-      const student: DbStudent = {
-        id: crypto.randomUUID(), // Generate ID since CSV doesn't have one
-        register_number: cols[colIndex('Reg.No.')] || '',
-        full_name: cols[colIndex('Name of the Student')] || '',
-        email: cols[colIndex('Email ID')] || '',
-        phone: '', // CSV doesn't have phone, will be empty
-        hostel_status: 'resident', // Default to resident, can be updated later
-        room_number: '', // CSV doesn't have room info, will be empty
-        is_active: true, // Default to active
-        face_embedding: null, // No face data in CSV
-        profile_image_url: null, // No profile image in CSV
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      students.push(student);
-    }
-    
-    return students;
-  } catch (error) {
-    console.error('Error loading students from CSV:', error);
-    throw error;
-  }
-};
 
 export function StudentsPage() {
   const { user, logout } = useAuth();
@@ -278,7 +204,13 @@ export function StudentsPage() {
   }, [students]);
 
   const filterStudents = useCallback(() => {
-    let filtered = students;
+    console.log('🔍 filterStudents called with:', { 
+      studentsCount: students.length, 
+      searchTerm, 
+      statusFilter 
+    });
+    
+    let filtered = [...students]; // Create a copy to avoid mutation
 
     // Apply search filter
     if (searchTerm) {
@@ -322,6 +254,11 @@ export function StudentsPage() {
       }
     }
 
+    console.log('✅ filterStudents result:', { 
+      filteredCount: filtered.length,
+      originalCount: students.length 
+    });
+    
     setFilteredStudents(filtered);
     
     // Calculate total pages based on filtered results
@@ -352,48 +289,263 @@ export function StudentsPage() {
     setCurrentPage(page);
   };
 
-  // Load data on component mount
-  useEffect(() => {
-    loadData();
+  const loadData = useCallback(async () => {
+    const loadStartTime = Date.now();
+    console.log('🚀 [LOAD_DATA] Starting data load process...');
+    console.log('🚀 [LOAD_DATA] Initial state:', {
+      isLoading: true,
+      hasError: false,
+      studentsCount: 0
+    });
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Step 1: Check environment variables
+      console.log('📋 [LOAD_DATA] Step 1: Checking environment variables...');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      console.log('📋 [LOAD_DATA] Environment variables:', {
+        urlExists: !!supabaseUrl,
+        urlValue: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING',
+        keyExists: !!supabaseKey,
+        keyValue: supabaseKey ? `${supabaseKey.substring(0, 20)}...` : 'MISSING'
+      });
+      
+      if (!supabaseUrl || !supabaseKey) {
+        const errorMsg = 'Missing Supabase environment variables. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.';
+        console.error('❌ [LOAD_DATA]', errorMsg);
+        setError(errorMsg);
+        toast.error('Database configuration missing. Please check your environment variables.');
+        return;
+      }
+
+      console.log('✅ [LOAD_DATA] Environment variables validated');
+      
+      // Step 2: Test basic connectivity
+      console.log('📡 [LOAD_DATA] Step 2: Testing basic network connectivity...');
+      try {
+        const connectivityTest = await Promise.race([
+          fetch('https://www.google.com', { 
+            method: 'HEAD', 
+            mode: 'no-cors',
+            cache: 'no-cache'
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Connectivity test timeout')), 3000))
+        ]).catch(() => null);
+        console.log('🌐 [LOAD_DATA] Connectivity test:', connectivityTest ? '✅ Online' : '⚠️ Offline or blocked');
+      } catch (connectError) {
+        console.warn('⚠️ [LOAD_DATA] Connectivity test failed:', connectError);
+      }
+
+      // Step 3: Test Supabase endpoint reachability
+      console.log('📡 [LOAD_DATA] Step 3: Testing Supabase endpoint reachability...');
+      try {
+        const endpointTest = await Promise.race([
+          fetch(`${supabaseUrl}/rest/v1/`, {
+            method: 'HEAD',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Endpoint test timeout')), 5000))
+        ]).catch(err => {
+          console.warn('⚠️ [LOAD_DATA] Endpoint test failed:', err);
+          return null;
+        });
+        const endpointStatus = endpointTest instanceof Response ? endpointTest.status : 'unknown';
+        console.log('🌐 [LOAD_DATA] Endpoint test:', endpointTest ? `✅ Reachable (${endpointStatus})` : '⚠️ Not reachable');
+      } catch (endpointError) {
+        console.warn('⚠️ [LOAD_DATA] Endpoint test error:', endpointError);
+      }
+
+      // Step 4: Try to load students from database
+      console.log('📡 [LOAD_DATA] Step 4: Loading students from database...');
+      const dbStartTime = Date.now();
+      
+      try {
+        // Add timeout wrapper to prevent indefinite hanging
+        // Retry logic is now built into getStudents(), so we give it more time (30 seconds)
+        const queryPromise = studentService.getStudents(2); // 2 retries = 3 total attempts
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout after 30 seconds')), 30000)
+        );
+        
+        console.log('📡 [LOAD_DATA] Executing query with retry logic and 30 second timeout...');
+        const studentsData = await Promise.race([queryPromise, timeoutPromise]);
+        
+        const elapsedTime = Date.now() - dbStartTime;
+        const totalTime = Date.now() - loadStartTime;
+        console.log(`✅ [LOAD_DATA] Loaded ${studentsData.length} students from database in ${elapsedTime}ms`);
+        console.log(`✅ [LOAD_DATA] Total load time: ${totalTime}ms`);
+        console.log('📊 [LOAD_DATA] Setting students state:', studentsData.length, 'students');
+        console.log('📊 [LOAD_DATA] First 3 students:', studentsData.slice(0, 3).map(s => ({
+          id: s.id,
+          name: s.full_name,
+          reg: s.register_number
+        })));
+        
+        // Set students data - this will trigger the filter effect
+        setStudents(studentsData);
+        
+        // Immediately update filtered students to ensure display
+        console.log('📊 [LOAD_DATA] Updating filtered students immediately');
+        setFilteredStudents([...studentsData]);
+        console.log('📊 [LOAD_DATA] Filtered students updated:', studentsData.length);
+        
+        setError(null); // Clear any previous errors
+        toast.success(`Loaded ${studentsData.length} students from database`);
+        console.log('✅ [LOAD_DATA] Data load completed successfully');
+      } catch (dbError) {
+        const elapsedTime = Date.now() - dbStartTime;
+        const totalTime = Date.now() - loadStartTime;
+        console.error(`❌ [LOAD_DATA] Database query failed after ${elapsedTime}ms (total: ${totalTime}ms)`);
+        console.error('❌ [LOAD_DATA] Error type:', dbError instanceof Error ? dbError.constructor.name : typeof dbError);
+        console.error('❌ [LOAD_DATA] Error details:', dbError);
+        
+        // Extract error details
+        const errorObj = dbError as { 
+          message?: string; 
+          hint?: string; 
+          code?: string; 
+          details?: string;
+          cause?: { name?: string };
+          stack?: string;
+        };
+        const errorDetails = errorObj?.message || errorObj?.details || 'Unknown error';
+        const errorCode = errorObj?.code || '';
+        const errorHint = errorObj?.hint || '';
+        
+        // Comprehensive error analysis
+        console.log('🔍 [LOAD_DATA] Error analysis:', {
+          message: errorDetails,
+          code: errorCode,
+          hint: errorHint,
+          elapsedTime: `${elapsedTime}ms`,
+          isTimeout: elapsedTime >= 14000,
+          isNetworkError: errorDetails.toLowerCase().includes('network') || 
+                         errorDetails.toLowerCase().includes('fetch') ||
+                         errorDetails.toLowerCase().includes('failed to fetch'),
+          isConnectionError: errorDetails.toLowerCase().includes('connection') ||
+                           errorDetails.toLowerCase().includes('timeout'),
+          isCorsError: errorDetails.toLowerCase().includes('cors'),
+          errorType: errorObj?.cause?.name || 'Unknown'
+        });
+        
+        // Check if it's a timeout or connection error
+        const isTimeout = elapsedTime >= 14000 || 
+                         errorDetails.toLowerCase().includes('timeout') || 
+                         errorDetails.toLowerCase().includes('network') ||
+                         errorDetails.toLowerCase().includes('connection') ||
+                         errorDetails.toLowerCase().includes('fetch');
+        
+        console.log('📋 [LOAD_DATA] Error classification:', {
+          isTimeout,
+          elapsedTime,
+          errorKeywords: errorDetails.toLowerCase()
+        });
+        
+        // Show error to user - no CSV fallback
+        if (isTimeout) {
+          const errorMsg = `Database connection timeout (${elapsedTime}ms). Please check your connection and try again.`;
+          setError(errorMsg);
+          console.error('❌ [LOAD_DATA] Database timeout error');
+          toast.error('Database connection timeout. Please check your internet connection and try again.');
+        } else {
+          const errorMsg = errorCode 
+            ? `Database error (${errorCode}): ${errorDetails}` 
+            : `Database error: ${errorDetails}`;
+          setError(errorMsg);
+          console.error('❌ [LOAD_DATA] Database error:', errorMsg);
+          toast.error(`Failed to load students: ${errorHint || errorDetails.substring(0, 60)}...`);
+        }
+        
+        // Set empty array to prevent showing stale data
+        setStudents([]);
+        setFilteredStudents([]);
+      }
+    } catch (err) {
+      const totalTime = Date.now() - loadStartTime;
+      console.error(`❌ [LOAD_DATA] Fatal error after ${totalTime}ms:`, err);
+      console.error('❌ [LOAD_DATA] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load students data';
+      setError(errorMessage);
+      toast.error(`Failed to load students data: ${errorMessage.substring(0, 100)}`);
+      // Set empty array to prevent infinite loading
+      setStudents([]);
+      console.error('❌ [LOAD_DATA] Data load failed completely');
+    } finally {
+      const totalTime = Date.now() - loadStartTime;
+      setIsLoading(false);
+      console.log(`🏁 [LOAD_DATA] Load process completed in ${totalTime}ms`);
+    }
   }, []);
 
-  // Filter students when search term or filter changes
+  // Load data on component mount
   useEffect(() => {
-    filterStudents();
-  }, [filterStudents]);
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true;
+    
+    // Safety timeout: force loading state to false after 25 seconds
+    // This is a fallback in case the database query hangs indefinitely
+    // Note: Query has 20s timeout, this gives 5s buffer
+    timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn('⚠️ Safety timeout: Forcing loading to complete after 25 seconds');
+        console.warn('⚠️ This suggests loadData() did not complete properly');
+        setIsLoading(false);
+      }
+    }, 25000);
+    
+    // Start loading data
+    loadData().catch(err => {
+      console.error('❌ [MOUNT] loadData failed:', err);
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }).finally(() => {
+      // Clear timeout if loadData completes before timeout
+      if (isMounted && timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    });
+    
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+  }, [loadData]); // Only depend on loadData, which is stable
+
+  // Filter students when search term or filter changes, or when students data changes
+  useEffect(() => {
+    console.log('🔄 [FILTER_EFFECT] Triggering filter...', { 
+      studentsCount: students.length, 
+      searchTerm, 
+      statusFilter,
+      filteredCount: filteredStudents.length
+    });
+    
+    // Only filter if we have students to filter
+    if (students.length > 0) {
+      filterStudents();
+    } else if (students.length === 0) {
+      // Clear filtered students if students array is empty
+      console.log('🔄 [FILTER_EFFECT] Clearing filtered students (no students)');
+      setFilteredStudents([]);
+    }
+  }, [filterStudents]); // filterStudents already depends on students, searchTerm, statusFilter
 
   // Calculate stats when students data changes
   useEffect(() => {
     calculateStats();
   }, [calculateStats]);
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Try to load students from Supabase database first
-      try {
-        const studentsData = await studentService.getStudents();
-        console.log(`Loaded ${studentsData.length} students from database`);
-        setStudents(studentsData);
-      } catch (dbError) {
-        console.error('Database connection failed, falling back to CSV:', dbError);
-        // Fallback to CSV if database fails
-        const studentsData = await loadStudentsFromCsv();
-        console.log(`Loaded ${studentsData.length} students from CSV`);
-        setStudents(studentsData);
-        toast.warning('Using CSV data - Database connection unavailable');
-      }
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load students data');
-      toast.error('Failed to load students data');
-      setStudents([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const resetAddForm = () => {
     setFormData({
@@ -565,6 +717,9 @@ export function StudentsPage() {
         return;
       }
       
+      console.log('📝 Creating student in database...');
+      
+      // Add student to database - simple direct call
       const newStudent = await studentService.createStudent({
         register_number: formData.register_number,
         full_name: formData.full_name,
@@ -577,17 +732,14 @@ export function StudentsPage() {
         is_active: formData.is_active,
       });
 
-      console.log('Student created successfully:', newStudent);
+      console.log('✅ Student created successfully in database:', newStudent);
 
-      // Optionally update local state immediately
+      // Add to local state
       setStudents(prev => [newStudent, ...prev]);
-      
-      // Reload data from database to ensure consistency
-      await loadData();
       
       setIsAddDialogOpen(false);
       resetAddForm();
-      toast.success('Student added successfully');
+      toast.success(`Student "${newStudent.full_name}" added successfully to database`);
     } catch (error) {
       console.error('Error adding student:', error);
       
@@ -1385,7 +1537,13 @@ export function StudentsPage() {
                       ? 'All students in the system'
                       : `Filtered from ${students.length} total students`
                     }
+                    {isLoading && ' (Loading...)'}
                   </CardDescription>
+                  {/* Debug info - remove in production */}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Debug: Total={students.length}, Filtered={filteredStudents.length}, 
+                    Paginated={getPaginatedStudents().length}, Page={currentPage}/{totalPages}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Show:</span>
@@ -1420,7 +1578,16 @@ export function StudentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStudents.length === 0 ? (
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                            <p className="text-muted-foreground">Loading students from database...</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredStudents.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8">
                           <div className="text-muted-foreground">
@@ -1428,14 +1595,33 @@ export function StudentsPage() {
                             <p>No students found</p>
                             {searchTerm || statusFilter !== 'all' ? (
                               <p className="text-sm">Try adjusting your search or filters</p>
-                            ) : (
+                            ) : students.length === 0 ? (
                               <p className="text-sm">Start by adding your first student</p>
+                            ) : (
+                              <p className="text-sm">No students match your search criteria</p>
+                            )}
+                            {students.length > 0 && (
+                              <p className="text-sm text-muted-foreground mt-2">
+                                Showing 0 of {students.length} total students
+                              </p>
                             )}
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      getPaginatedStudents().map((student) => (
+                      (() => {
+                        const paginated = getPaginatedStudents();
+                        console.log('🖥️ [RENDER] Render stats:', {
+                          totalStudents: students.length,
+                          filteredStudents: filteredStudents.length,
+                          paginated: paginated.length,
+                          currentPage,
+                          pageSize,
+                          totalPages
+                        });
+                        return paginated.map((student) => {
+                          console.log('🖥️ [RENDER] Rendering student:', student.full_name, student.register_number);
+                          return (
                         <TableRow key={student.id}>
                           <TableCell>
                             <div>
@@ -1563,7 +1749,9 @@ export function StudentsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      });
+                      })()
                     )}
                   </TableBody>
                 </Table>
