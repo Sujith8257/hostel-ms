@@ -24,6 +24,7 @@ import { AdminDashboard } from '@/pages/AdminDashboard';
 import { AlertsPage } from '@/pages/AlertsPage';
 import { RoomManagementPage } from '@/pages/RoomManagementPage';
 import { StudentsPage } from '@/pages/StudentsPage';
+import { StudentsDetailsPage } from '@/pages/StudentsDetailsPage';
 import { EntryExitLogsPage } from '@/pages/EntryExitLogsPage';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { Toaster } from "@/components/ui/sonner"
@@ -68,6 +69,7 @@ function AppContent() {
         
         {/* Management Pages */}
         <Route path="/students" element={<StudentsPage />} />
+        <Route path="/students-details" element={<StudentsDetailsPage />} />
         <Route path="/entries" element={<EntryExitLogsPage />} />
         <Route path="/alerts" element={<AlertsPage />} />
         <Route path="/rooms" element={<RoomManagementPage />} />

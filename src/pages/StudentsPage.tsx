@@ -37,9 +37,13 @@ import {
   LogOut,
   BarChart3,
   HelpCircle,
-  Building2
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { studentService } from '@/lib/services';
 import { roomApi, adminApi } from '@/api/client';
@@ -89,9 +93,9 @@ interface StudentStats {
   faceNotEnrolled: number;
 }
 
+
 export function StudentsPage() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await logout();
@@ -127,6 +131,11 @@ export function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+  const [totalPages, setTotalPages] = useState(0);
   
   // Room allocation states
   const [isRoomAllocationOpen, setIsRoomAllocationOpen] = useState(false);
@@ -195,7 +204,13 @@ export function StudentsPage() {
   }, [students]);
 
   const filterStudents = useCallback(() => {
-    let filtered = students;
+    console.log('🔍 filterStudents called with:', { 
+      studentsCount: students.length, 
+      searchTerm, 
+      statusFilter 
+    });
+    
+    let filtered = [...students]; // Create a copy to avoid mutation
 
     // Apply search filter
     if (searchTerm) {
@@ -239,171 +254,298 @@ export function StudentsPage() {
       }
     }
 
+    console.log('✅ filterStudents result:', { 
+      filteredCount: filtered.length,
+      originalCount: students.length 
+    });
+    
     setFilteredStudents(filtered);
-  }, [students, searchTerm, statusFilter]);
+    
+    // Calculate total pages based on filtered results
+    const total = Math.ceil(filtered.length / pageSize);
+    setTotalPages(total);
+    
+    // Reset to first page if current page is beyond total pages
+    if (currentPage > total && total > 0) {
+      setCurrentPage(1);
+    }
+  }, [students, searchTerm, statusFilter, pageSize, currentPage]);
+
+  // Get paginated students
+  const getPaginatedStudents = useCallback(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredStudents.slice(startIndex, endIndex);
+  }, [filteredStudents, currentPage, pageSize]);
+
+  // Handle page size change
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const loadData = useCallback(async () => {
+    const loadStartTime = Date.now();
+    console.log('🚀 [LOAD_DATA] Starting data load process...');
+    console.log('🚀 [LOAD_DATA] Initial state:', {
+      isLoading: true,
+      hasError: false,
+      studentsCount: 0
+    });
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Step 1: Check environment variables
+      console.log('📋 [LOAD_DATA] Step 1: Checking environment variables...');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      console.log('📋 [LOAD_DATA] Environment variables:', {
+        urlExists: !!supabaseUrl,
+        urlValue: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING',
+        keyExists: !!supabaseKey,
+        keyValue: supabaseKey ? `${supabaseKey.substring(0, 20)}...` : 'MISSING'
+      });
+      
+      if (!supabaseUrl || !supabaseKey) {
+        const errorMsg = 'Missing Supabase environment variables. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.';
+        console.error('❌ [LOAD_DATA]', errorMsg);
+        setError(errorMsg);
+        toast.error('Database configuration missing. Please check your environment variables.');
+        return;
+      }
+
+      console.log('✅ [LOAD_DATA] Environment variables validated');
+      
+      // Step 2: Test basic connectivity
+      console.log('📡 [LOAD_DATA] Step 2: Testing basic network connectivity...');
+      try {
+        const connectivityTest = await Promise.race([
+          fetch('https://www.google.com', { 
+            method: 'HEAD', 
+            mode: 'no-cors',
+            cache: 'no-cache'
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Connectivity test timeout')), 3000))
+        ]).catch(() => null);
+        console.log('🌐 [LOAD_DATA] Connectivity test:', connectivityTest ? '✅ Online' : '⚠️ Offline or blocked');
+      } catch (connectError) {
+        console.warn('⚠️ [LOAD_DATA] Connectivity test failed:', connectError);
+      }
+
+      // Step 3: Test Supabase endpoint reachability
+      console.log('📡 [LOAD_DATA] Step 3: Testing Supabase endpoint reachability...');
+      try {
+        const endpointTest = await Promise.race([
+          fetch(`${supabaseUrl}/rest/v1/`, {
+            method: 'HEAD',
+            headers: {
+              'apikey': supabaseKey,
+              'Authorization': `Bearer ${supabaseKey}`
+            }
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Endpoint test timeout')), 5000))
+        ]).catch(err => {
+          console.warn('⚠️ [LOAD_DATA] Endpoint test failed:', err);
+          return null;
+        });
+        const endpointStatus = endpointTest instanceof Response ? endpointTest.status : 'unknown';
+        console.log('🌐 [LOAD_DATA] Endpoint test:', endpointTest ? `✅ Reachable (${endpointStatus})` : '⚠️ Not reachable');
+      } catch (endpointError) {
+        console.warn('⚠️ [LOAD_DATA] Endpoint test error:', endpointError);
+      }
+
+      // Step 4: Try to load students from database
+      console.log('📡 [LOAD_DATA] Step 4: Loading students from database...');
+      const dbStartTime = Date.now();
+      
+      try {
+        // Add timeout wrapper to prevent indefinite hanging
+        // Retry logic is now built into getStudents(), so we give it more time (30 seconds)
+        const queryPromise = studentService.getStudents(2); // 2 retries = 3 total attempts
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout after 30 seconds')), 30000)
+        );
+        
+        console.log('📡 [LOAD_DATA] Executing query with retry logic and 30 second timeout...');
+        const studentsData = await Promise.race([queryPromise, timeoutPromise]);
+        
+        const elapsedTime = Date.now() - dbStartTime;
+        const totalTime = Date.now() - loadStartTime;
+        console.log(`✅ [LOAD_DATA] Loaded ${studentsData.length} students from database in ${elapsedTime}ms`);
+        console.log(`✅ [LOAD_DATA] Total load time: ${totalTime}ms`);
+        console.log('📊 [LOAD_DATA] Setting students state:', studentsData.length, 'students');
+        console.log('📊 [LOAD_DATA] First 3 students:', studentsData.slice(0, 3).map(s => ({
+          id: s.id,
+          name: s.full_name,
+          reg: s.register_number
+        })));
+        
+        // Set students data - this will trigger the filter effect
+        setStudents(studentsData);
+        
+        // Immediately update filtered students to ensure display
+        console.log('📊 [LOAD_DATA] Updating filtered students immediately');
+        setFilteredStudents([...studentsData]);
+        console.log('📊 [LOAD_DATA] Filtered students updated:', studentsData.length);
+        
+        setError(null); // Clear any previous errors
+        toast.success(`Loaded ${studentsData.length} students from database`);
+        console.log('✅ [LOAD_DATA] Data load completed successfully');
+      } catch (dbError) {
+        const elapsedTime = Date.now() - dbStartTime;
+        const totalTime = Date.now() - loadStartTime;
+        console.error(`❌ [LOAD_DATA] Database query failed after ${elapsedTime}ms (total: ${totalTime}ms)`);
+        console.error('❌ [LOAD_DATA] Error type:', dbError instanceof Error ? dbError.constructor.name : typeof dbError);
+        console.error('❌ [LOAD_DATA] Error details:', dbError);
+        
+        // Extract error details
+        const errorObj = dbError as { 
+          message?: string; 
+          hint?: string; 
+          code?: string; 
+          details?: string;
+          cause?: { name?: string };
+          stack?: string;
+        };
+        const errorDetails = errorObj?.message || errorObj?.details || 'Unknown error';
+        const errorCode = errorObj?.code || '';
+        const errorHint = errorObj?.hint || '';
+        
+        // Comprehensive error analysis
+        console.log('🔍 [LOAD_DATA] Error analysis:', {
+          message: errorDetails,
+          code: errorCode,
+          hint: errorHint,
+          elapsedTime: `${elapsedTime}ms`,
+          isTimeout: elapsedTime >= 14000,
+          isNetworkError: errorDetails.toLowerCase().includes('network') || 
+                         errorDetails.toLowerCase().includes('fetch') ||
+                         errorDetails.toLowerCase().includes('failed to fetch'),
+          isConnectionError: errorDetails.toLowerCase().includes('connection') ||
+                           errorDetails.toLowerCase().includes('timeout'),
+          isCorsError: errorDetails.toLowerCase().includes('cors'),
+          errorType: errorObj?.cause?.name || 'Unknown'
+        });
+        
+        // Check if it's a timeout or connection error
+        const isTimeout = elapsedTime >= 14000 || 
+                         errorDetails.toLowerCase().includes('timeout') || 
+                         errorDetails.toLowerCase().includes('network') ||
+                         errorDetails.toLowerCase().includes('connection') ||
+                         errorDetails.toLowerCase().includes('fetch');
+        
+        console.log('📋 [LOAD_DATA] Error classification:', {
+          isTimeout,
+          elapsedTime,
+          errorKeywords: errorDetails.toLowerCase()
+        });
+        
+        // Show error to user - no CSV fallback
+        if (isTimeout) {
+          const errorMsg = `Database connection timeout (${elapsedTime}ms). Please check your connection and try again.`;
+          setError(errorMsg);
+          console.error('❌ [LOAD_DATA] Database timeout error');
+          toast.error('Database connection timeout. Please check your internet connection and try again.');
+        } else {
+          const errorMsg = errorCode 
+            ? `Database error (${errorCode}): ${errorDetails}` 
+            : `Database error: ${errorDetails}`;
+          setError(errorMsg);
+          console.error('❌ [LOAD_DATA] Database error:', errorMsg);
+          toast.error(`Failed to load students: ${errorHint || errorDetails.substring(0, 60)}...`);
+        }
+        
+        // Set empty array to prevent showing stale data
+        setStudents([]);
+        setFilteredStudents([]);
+      }
+    } catch (err) {
+      const totalTime = Date.now() - loadStartTime;
+      console.error(`❌ [LOAD_DATA] Fatal error after ${totalTime}ms:`, err);
+      console.error('❌ [LOAD_DATA] Error stack:', err instanceof Error ? err.stack : 'No stack trace');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load students data';
+      setError(errorMessage);
+      toast.error(`Failed to load students data: ${errorMessage.substring(0, 100)}`);
+      // Set empty array to prevent infinite loading
+      setStudents([]);
+      console.error('❌ [LOAD_DATA] Data load failed completely');
+    } finally {
+      const totalTime = Date.now() - loadStartTime;
+      setIsLoading(false);
+      console.log(`🏁 [LOAD_DATA] Load process completed in ${totalTime}ms`);
+    }
+  }, []);
 
   // Load data on component mount
   useEffect(() => {
-    const loadDataWithFallback = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Try to load from API with timeout
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 3000)
-        );
-        
-        const studentsData = await Promise.race([
-          studentService.getStudents(),
-          timeoutPromise
-        ]) as DbStudent[];
-        
-        console.log(`Loaded ${studentsData.length} students from database`);
-        setStudents(studentsData);
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isMounted = true;
+    
+    // Safety timeout: force loading state to false after 25 seconds
+    // This is a fallback in case the database query hangs indefinitely
+    // Note: Query has 20s timeout, this gives 5s buffer
+    timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn('⚠️ Safety timeout: Forcing loading to complete after 25 seconds');
+        console.warn('⚠️ This suggests loadData() did not complete properly');
         setIsLoading(false);
-      } catch (err) {
-        console.error('Error loading data:', err);
-        
-        // Fallback to mock data if API fails
-        console.log('Using fallback mock data');
-        const mockStudents: DbStudent[] = [
-          {
-            id: '1',
-            register_number: 'REG001',
-            full_name: 'John Doe',
-            email: 'john.doe@example.com',
-            phone: '+1234567890',
-            hostel_status: 'resident',
-            room_number: 'A-101',
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            register_number: 'REG002',
-            full_name: 'Jane Smith',
-            email: 'jane.smith@example.com',
-            phone: '+1234567891',
-            hostel_status: 'day_scholar',
-            room_number: null,
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          },
-          {
-            id: '3',
-            register_number: 'REG003',
-            full_name: 'Bob Johnson',
-            email: 'bob.johnson@example.com',
-            phone: '+1234567892',
-            hostel_status: 'resident',
-            room_number: 'B-205',
-            face_embedding: null,
-            profile_image_url: null,
-            is_active: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        ];
-        
-        setStudents(mockStudents);
+      }
+    }, 25000);
+    
+    // Start loading data
+    loadData().catch(err => {
+      console.error('❌ [MOUNT] loadData failed:', err);
+      if (isMounted) {
         setIsLoading(false);
-        toast.info('Using demo data - API connection failed');
+      }
+    }).finally(() => {
+      // Clear timeout if loadData completes before timeout
+      if (isMounted && timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    });
+    
+    return () => {
+      isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
       }
     };
+  }, [loadData]); // Only depend on loadData, which is stable
 
-    loadDataWithFallback();
-  }, []);
-
-  // Filter students when search term or filter changes
+  // Filter students when search term or filter changes, or when students data changes
   useEffect(() => {
-    filterStudents();
-  }, [filterStudents]);
+    console.log('🔄 [FILTER_EFFECT] Triggering filter...', { 
+      studentsCount: students.length, 
+      searchTerm, 
+      statusFilter,
+      filteredCount: filteredStudents.length
+    });
+    
+    // Only filter if we have students to filter
+    if (students.length > 0) {
+      filterStudents();
+    } else if (students.length === 0) {
+      // Clear filtered students if students array is empty
+      console.log('🔄 [FILTER_EFFECT] Clearing filtered students (no students)');
+      setFilteredStudents([]);
+    }
+  }, [filterStudents]); // filterStudents already depends on students, searchTerm, statusFilter
 
   // Calculate stats when students data changes
   useEffect(() => {
     calculateStats();
   }, [calculateStats]);
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Try to load from API with timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 5000)
-      );
-      
-      const studentsData = await Promise.race([
-        studentService.getStudents(),
-        timeoutPromise
-      ]) as DbStudent[];
-      
-      console.log(`Loaded ${studentsData.length} students from database`);
-      setStudents(studentsData);
-    } catch (err) {
-      console.error('Error loading data:', err);
-      
-      // Fallback to mock data if API fails
-      console.log('Using fallback mock data');
-      const mockStudents: DbStudent[] = [
-        {
-          id: '1',
-          register_number: 'REG001',
-          full_name: 'John Doe',
-          email: 'john.doe@example.com',
-          phone: '+1234567890',
-          hostel_status: 'resident',
-          room_number: 'A-101',
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          register_number: 'REG002',
-          full_name: 'Jane Smith',
-          email: 'jane.smith@example.com',
-          phone: '+1234567891',
-          hostel_status: 'day_scholar',
-          room_number: null,
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          register_number: 'REG003',
-          full_name: 'Bob Johnson',
-          email: 'bob.johnson@example.com',
-          phone: '+1234567892',
-          hostel_status: 'resident',
-          room_number: 'B-205',
-          face_embedding: null,
-          profile_image_url: null,
-          is_active: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ];
-      
-      setStudents(mockStudents);
-      toast.info('Using demo data - API connection failed');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const resetAddForm = () => {
     setFormData({
@@ -563,6 +705,21 @@ export function StudentsPage() {
         return;
       }
 
+      console.log('Adding student with data:', formData);
+      
+      // Check if register number already exists
+      const existingStudents = students.filter(s => 
+        s.register_number.toLowerCase() === formData.register_number.toLowerCase()
+      );
+      
+      if (existingStudents.length > 0) {
+        toast.error(`A student with register number "${formData.register_number}" already exists`);
+        return;
+      }
+      
+      console.log('📝 Creating student in database...');
+      
+      // Add student to database - simple direct call
       const newStudent = await studentService.createStudent({
         register_number: formData.register_number,
         full_name: formData.full_name,
@@ -575,13 +732,45 @@ export function StudentsPage() {
         is_active: formData.is_active,
       });
 
+      console.log('✅ Student created successfully in database:', newStudent);
+
+      // Add to local state
       setStudents(prev => [newStudent, ...prev]);
+      
       setIsAddDialogOpen(false);
       resetAddForm();
-      toast.success('Student added successfully');
+      toast.success(`Student "${newStudent.full_name}" added successfully to database`);
     } catch (error) {
       console.error('Error adding student:', error);
-      toast.error('Failed to add student');
+      
+      // Check if error has expected properties
+      const errorObj = error as { code?: string; message?: string; details?: string; hint?: string };
+      
+      console.error('Error details:', {
+        message: errorObj?.message,
+        code: errorObj?.code,
+        details: errorObj?.details,
+        hint: errorObj?.hint,
+        error: error
+      });
+      
+      // Provide better error messages based on error type
+      let errorMessage = 'Failed to add student';
+      if (errorObj?.code === '23505' || errorObj?.code === 'P2002') {
+        // Unique constraint violation
+        errorMessage = `A student with register number "${formData.register_number}" already exists. Please use a different register number.`;
+      } else if (errorObj?.code === '42501' || errorObj?.message?.includes('permission denied')) {
+        // Permission denied
+        errorMessage = 'Permission denied. You may need to adjust Row Level Security (RLS) policies on the students table.';
+      } else if (errorObj?.message) {
+        errorMessage = errorObj.message;
+      } else if (errorObj?.details) {
+        errorMessage = errorObj.details;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
@@ -608,12 +797,16 @@ export function StudentsPage() {
           student.id === selectedStudent.id ? updatedStudent : student
         )
       );
+      
+      // Reload data from database to ensure consistency
+      await loadData();
+      
       setIsEditDialogOpen(false);
       setSelectedStudent(null);
       toast.success('Student updated successfully');
     } catch (error) {
       console.error('Error updating student:', error);
-      toast.error('Failed to update student');
+      toast.error('Failed to update student: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -622,11 +815,17 @@ export function StudentsPage() {
 
     try {
       await studentService.deleteStudent(student.id);
+      
+      // Optionally update local state immediately
       setStudents(prev => prev.filter(s => s.id !== student.id));
+      
+      // Reload data from database to ensure consistency
+      await loadData();
+      
       toast.success('Student deleted successfully');
     } catch (error) {
       console.error('Error deleting student:', error);
-      toast.error('Failed to delete student');
+      toast.error('Failed to delete student: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -1330,13 +1529,39 @@ export function StudentsPage() {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Students ({filteredStudents.length})</CardTitle>
-              <CardDescription>
-                {filteredStudents.length === students.length 
-                  ? 'All students in the system'
-                  : `Filtered from ${students.length} total students`
-                }
-              </CardDescription>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                  <CardTitle>Students ({filteredStudents.length})</CardTitle>
+                  <CardDescription>
+                    {filteredStudents.length === students.length 
+                      ? 'All students in the system'
+                      : `Filtered from ${students.length} total students`
+                    }
+                    {isLoading && ' (Loading...)'}
+                  </CardDescription>
+                  {/* Debug info - remove in production */}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Debug: Total={students.length}, Filtered={filteredStudents.length}, 
+                    Paginated={getPaginatedStudents().length}, Page={currentPage}/{totalPages}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Show:</span>
+                  <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(Number(value))}>
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">per page</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-md border">
@@ -1353,7 +1578,16 @@ export function StudentsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredStudents.length === 0 ? (
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          <div className="flex flex-col items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
+                            <p className="text-muted-foreground">Loading students from database...</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredStudents.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-8">
                           <div className="text-muted-foreground">
@@ -1361,14 +1595,33 @@ export function StudentsPage() {
                             <p>No students found</p>
                             {searchTerm || statusFilter !== 'all' ? (
                               <p className="text-sm">Try adjusting your search or filters</p>
-                            ) : (
+                            ) : students.length === 0 ? (
                               <p className="text-sm">Start by adding your first student</p>
+                            ) : (
+                              <p className="text-sm">No students match your search criteria</p>
+                            )}
+                            {students.length > 0 && (
+                              <p className="text-sm text-muted-foreground mt-2">
+                                Showing 0 of {students.length} total students
+                              </p>
                             )}
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredStudents.map((student) => (
+                      (() => {
+                        const paginated = getPaginatedStudents();
+                        console.log('🖥️ [RENDER] Render stats:', {
+                          totalStudents: students.length,
+                          filteredStudents: filteredStudents.length,
+                          paginated: paginated.length,
+                          currentPage,
+                          pageSize,
+                          totalPages
+                        });
+                        return paginated.map((student) => {
+                          console.log('🖥️ [RENDER] Rendering student:', student.full_name, student.register_number);
+                          return (
                         <TableRow key={student.id}>
                           <TableCell>
                             <div>
@@ -1496,12 +1749,85 @@ export function StudentsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
+                        );
+                      });
+                      })()
                     )}
                   </TableBody>
                 </Table>
               </div>
             </CardContent>
+            
+            {/* Pagination Controls */}
+            {filteredStudents.length > 0 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredStudents.length)} of {filteredStudents.length} students
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         </motion.div>
 

@@ -70,7 +70,7 @@ def decode_base64_embedding(data: str) -> Optional[bytes]:
         print(f"Failed to decode base64: {e}")
         return None
 
-def get_all_students(limit: int = 3000) -> List[Dict]:
+def get_all_students(limit: int = 2000) -> List[Dict]:
     """Fetch all students from Supabase with non-null face embeddings"""
     try:
         print(f"🔍 Fetching students with face embeddings from Supabase (limit: {limit})...")
@@ -89,41 +89,7 @@ def get_all_students(limit: int = 3000) -> List[Dict]:
         else:
             print(f"   No students with face embeddings found")
             
-        data = result.data if result.data else []
-        for s in data:
-            try:
-                if 'register_number' in s and s['register_number'] is not None:
-                    s['register_number'] = str(s['register_number']).strip()
-                if 'full_name' in s and s['full_name'] is None:
-                    s['full_name'] = ''
-            except Exception:
-                pass
-
-        # Targeted debug checks for specific register numbers
-        try:
-            target_regs = ["99220041253", "9920041253"]
-            present_with_face = {str(x.get('register_number', '')).strip() for x in data}
-            print("🔎 Debug check (with-face list):")
-            for reg in target_regs:
-                print(f"   - {reg} present: {reg in present_with_face}")
-
-            # Cross-check in full active list (including those without face embeddings)
-            try:
-                all_active = get_all_students_including_no_face(limit=limit)
-                all_map = {str(s.get('register_number', '')).strip(): s for s in all_active}
-                print("🔎 Cross-check in all active students (including no-face):")
-                for reg in target_regs:
-                    in_all = reg in all_map
-                    has_face = None
-                    if in_all:
-                        emb = all_map[reg].get('face_embedding')
-                        has_face = (emb is not None)
-                    print(f"   - {reg} present: {in_all}; has_face_embedding: {has_face}")
-            except Exception as cross_e:
-                print(f"   Cross-check failed: {cross_e}")
-        except Exception as dbg_e:
-            print(f"   Debug check error: {dbg_e}")
-        return data
+        return result.data if result.data else []
     except Exception as e:
         print(f"❌ Error fetching students from Supabase: {e}")
         print(f"   Exception type: {type(e)}")
@@ -132,48 +98,8 @@ def get_all_students(limit: int = 3000) -> List[Dict]:
 def get_all_students_including_no_face(limit: int = 2000) -> List[Dict]:
     """Fetch all students from Supabase (including those without face embeddings)"""
     try:
-        # Paginate to bypass Supabase default row limits
-        page_size = 1000
-        max_total = limit if limit and limit > 0 else 3000
-        collected = []
-        start = 0
-        print(f"[get_all_students_including_no_face] start pagination for up to {max_total} rows")
-        while len(collected) < max_total:
-            end = start + min(page_size, max_total - len(collected)) - 1
-            try:
-                page = (
-                    supabase
-                    .table('students')
-                    .select('*')
-                    .eq('is_active', True)
-                    .order('register_number', asc=True)
-                    .range(start, end)
-                    .execute()
-                )
-                rows = page.data or []
-            except Exception as e:
-                print(f"Error fetching page start={start} end={end}: {e}")
-                break
-            print(f"  fetched page {start}-{end}: {len(rows)} rows")
-            if not rows:
-                break
-            collected.extend(rows)
-            # If fewer rows returned than requested, we've reached the end
-            if len(rows) < (end - start + 1):
-                break
-            start = end + 1
-        # Normalize rows
-        data = []
-        for s in collected:
-            try:
-                if 'register_number' in s and s['register_number'] is not None:
-                    s['register_number'] = str(s['register_number']).strip()
-                if 'full_name' in s and s['full_name'] is None:
-                    s['full_name'] = ''
-            except Exception:
-                pass
-            data.append(s)
-        return data
+        result = supabase.table('students').select('*').eq('is_active', True).limit(limit).execute()
+        return result.data if result.data else []
     except Exception as e:
         print(f"Error fetching all students from Supabase: {e}")
         return []
@@ -190,23 +116,15 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
         print(f"   List type: {type(embedding_list)}")
         print(f"   First 3 values: {embedding_list[:3]}")
         
-        # Normalize register number
-        reg = str(register_number).strip()
-        # Check if student already exists (string comparison)
-        existing_student = supabase.table('students').select('*').eq('register_number', reg).execute()
-        # Fallback: if not found and numeric, try numeric comparison
-        if (not existing_student.data) and reg.isdigit():
-            try:
-                existing_student = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
-            except Exception:
-                pass
+        # Check if student already exists
+        existing_student = supabase.table('students').select('*').eq('register_number', register_number).execute()
         
         if existing_student.data:
             # Update existing student with face embedding
             result = supabase.table('students').update({
                 'face_embedding': embedding_list,
                 'updated_at': datetime.now().isoformat()
-            }).eq('register_number', existing_student.data[0]['register_number']).execute()
+            }).eq('register_number', register_number).execute()
             
             # Log the embedding update
             student_info = existing_student.data[0]
@@ -220,7 +138,7 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
         else:
             # Create new student record
             result = supabase.table('students').insert({
-                'register_number': reg,
+                'register_number': register_number,
                 'full_name': full_name or f"Student {register_number}",
                 'face_embedding': embedding_list,
                 'hostel_status': 'resident',
@@ -314,19 +232,8 @@ def get_embedding_from_supabase(register_number: str) -> Optional[np.ndarray]:
 def student_exists(register_number: str) -> bool:
     """Check if student exists in Supabase"""
     try:
-        reg = str(register_number).strip()
-        result = supabase.table('students').select('id').eq('register_number', reg).eq('is_active', True).execute()
-        if result.data and len(result.data) > 0:
-            return True
-        # If not found and reg is numeric, try numeric comparison (in case column is numeric)
-        if reg.isdigit():
-            try:
-                num = int(reg)
-                result_num = supabase.table('students').select('id').eq('register_number', num).eq('is_active', True).execute()
-                return bool(result_num.data)
-            except Exception:
-                pass
-        return False
+        result = supabase.table('students').select('id').eq('register_number', register_number).eq('is_active', True).execute()
+        return len(result.data) > 0
     except Exception as e:
         print(f"Error checking student existence: {e}")
         return False
@@ -402,30 +309,8 @@ def log_attendance(student_id: str, marked_by: str, status: str = 'present', bui
 def get_student_by_register_number(register_number: str) -> Optional[Dict]:
     """Get full student information by register number"""
     try:
-        reg = str(register_number).strip()
-        result = supabase.table('students').select('*').eq('register_number', reg).eq('is_active', True).execute()
-        if result.data and len(result.data) > 0:
-            student = result.data[0]
-            if 'register_number' in student and student['register_number'] is not None:
-                student['register_number'] = str(student['register_number']).strip()
-            if 'full_name' in student and student['full_name'] is None:
-                student['full_name'] = ''
-            return student
-        # Fallback: if numeric, try integer query (in case column is numeric)
-        if reg.isdigit():
-            try:
-                num = int(reg)
-                result_num = supabase.table('students').select('*').eq('register_number', num).eq('is_active', True).execute()
-                if result_num.data:
-                    student = result_num.data[0]
-                    if 'register_number' in student and student['register_number'] is not None:
-                        student['register_number'] = str(student['register_number']).strip()
-                    if 'full_name' in student and student['full_name'] is None:
-                        student['full_name'] = ''
-                    return student
-            except Exception:
-                pass
-        return None
+        result = supabase.table('students').select('*').eq('register_number', register_number).eq('is_active', True).execute()
+        return result.data[0] if result.data else None
     except Exception as e:
         print(f"Error getting student info: {e}")
         return None
@@ -448,135 +333,6 @@ def preprocess_face(image):
         face = cv2.resize(face, (112, 112))
         face = face.astype("float32") / 127.5 - 1.0
         return np.expand_dims(face, axis=0)
-
-# ------------------------------
-# Face detection bbox + annotation helpers
-# ------------------------------
-def detect_face_and_bbox(image):
-    """Detect face with MediaPipe and return (preprocessed_face, (x1,y1,x2,y2))."""
-    with mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=0.5) as face_detection:
-        results = face_detection.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        if not results.detections:
-            return None, None
-        bbox = results.detections[0].location_data.relative_bounding_box
-        h, w, _ = image.shape
-        x1, y1 = max(0, int(bbox.xmin * w)), max(0, int(bbox.ymin * h))
-        x2, y2 = min(w, x1 + int(bbox.width * w)), min(h, y1 + int(bbox.height * h))
-        face = image[y1:y2, x1:x2]
-        if face.size == 0:
-            return None, None
-        face = cv2.resize(face, (112, 112))
-        face = face.astype("float32") / 127.5 - 1.0
-        face = np.expand_dims(face, axis=0)
-        return face, (x1, y1, x2, y2)
-
-def _draw_text_with_bg(img, text, org, font_scale=0.6, thickness=2, text_color=(255,255,255), bg_color=(0,0,0), font=None, line_type=None):
-    if font is None:
-        font = cv2.FONT_HERSHEY_SIMPLEX
-    if line_type is None:
-        line_type = cv2.LINE_AA
-    (tw, th), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-    x, y = org
-    x0 = max(0, x)
-    y0 = max(0, y - th - baseline)
-    x1 = min(img.shape[1] - 1, x + tw)
-    y1 = min(img.shape[0] - 1, y + baseline)
-    cv2.rectangle(img, (x0, y0), (x1, y1), bg_color, -1)
-    cv2.putText(img, text, (x, y - baseline), font, font_scale, text_color, thickness, line_type)
-
-# def annotate_image_with_bbox(image, bbox, top_text, bottom_right_text):
-#     if bbox is None:
-#         return None
-
-#     x1, y1, x2, y2 = bbox
-#     annotated = image.copy()
-#     h, w = annotated.shape[:2]
-
-#     # Draw bbox
-#     cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 0), 2)
-
-#     # --- Register number (top_text) ---
-#     _draw_text_with_bg(
-#         annotated,
-#         str(top_text),
-#         (x1, max(0, y1 - 8)),
-#         font=cv2.FONT_HERSHEY_DUPLEX,
-#         font_scale=0.7,
-#         thickness=1,
-#         bg_color=(0, 128, 0),
-#         text_color=(255, 255, 255),
-#         line_type=cv2.LINE_AA
-#     )
-
-#     # --- Timestamp (bottom_right_text) ---
-#     font = cv2.FONT_HERSHEY_DUPLEX
-#     bottom_scale = 0.6
-#     thickness = 1
-#     (tw, th), baseline = cv2.getTextSize(str(bottom_right_text), font, bottom_scale, thickness)
-#     ts_x = max(0, w - tw - 10)
-#     ts_y = h - 10
-#     _draw_text_with_bg(
-#         annotated,
-#         str(bottom_right_text),
-#         (ts_x, ts_y),
-#         font=font,
-#         font_scale=bottom_scale,
-#         thickness=thickness,
-#         bg_color=(0, 0, 0),
-#         text_color=(255, 255, 255),
-#         line_type=cv2.LINE_AA
-#     )
-
-#     ok, buf = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
-#     if not ok:
-#         return None
-#     return base64.b64encode(buf.tobytes()).decode('utf-8')
-
-def annotate_image_with_bbox(image, bbox, top_text, bottom_right_text):
-    if bbox is None:
-        return None
-    x1, y1, x2, y2 = bbox
-    annotated = image.copy()
-    h, w = annotated.shape[:2]
-    # Draw bbox
-      # Draw bbox
-    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 200, 0), 2)
-
-    # --- Register number (top_text) ---
-    _draw_text_with_bg(
-        annotated,
-        str(top_text),
-        (x1, max(0, y1 - 8)),
-        font_scale=0.7,
-        thickness=1,
-        bg_color=(0, 128, 0),
-        text_color=(255, 255, 255),
-        font=cv2.FONT_HERSHEY_DUPLEX,
-        line_type=cv2.LINE_AA
-    )
-
-    # --- Timestamp (bottom_right_text) ---
-    font = cv2.FONT_HERSHEY_DUPLEX
-    bottom_scale = 0.6
-    thickness = 1
-    (tw, th), baseline = cv2.getTextSize(str(bottom_right_text), font, bottom_scale, thickness)
-    ts_x = max(0, w - tw - 10)
-    ts_y = h - 10
-    _draw_text_with_bg(
-        annotated,
-        str(bottom_right_text),
-        (ts_x, ts_y),
-        font_scale=bottom_scale,
-        thickness=thickness,
-        bg_color=(0, 0, 0),
-        text_color=(255, 255, 255),
-        font=font,
-        line_type=cv2.LINE_AA
-    )
-    ok, buf = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-    if not ok:
-        return None
-    return base64.b64encode(buf.tobytes()).decode('utf-8')
 
 # ------------------------------
 # Get embedding
@@ -820,7 +576,7 @@ DASHBOARD_HTML = """
         </div>
 
         <!-- Main Content Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Student Registration -->
             <div class="card p-6">
                 <h3 class="text-xl font-semibold mb-4">📝 Student Registration</h3>
@@ -828,7 +584,10 @@ DASHBOARD_HTML = """
                 <!-- Student Search -->
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Search Students:</label>
-                    <input type="text" id="studentSearch" class="form-input" placeholder="Search by name or register number..." onkeyup="filterStudents()">
+                    <div class="flex gap-2">
+                        <input type="text" id="studentSearch" class="form-input flex-1" placeholder="Search by name or register number..." onkeyup="debounceFilterStudents()">
+                        <button onclick="clearSearch()" class="btn-secondary" title="Clear search">Clear</button>
+                    </div>
                 </div>
 
                 <!-- Student List -->
@@ -896,7 +655,32 @@ DASHBOARD_HTML = """
                 </div>
             </div>
 
-
+            <!-- Authentication -->
+            <div class="card p-6">
+                <h3 class="text-xl font-semibold mb-4">🔍 Authentication</h3>
+                
+                <form id="authForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Register Number:</label>
+                        <input type="text" id="authRegisterNumber" name="authRegisterNumber" class="form-input" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Face Image:</label>
+                        <input type="file" id="authImageFile" name="authImageFile" accept="image/*" class="form-input" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Location:</label>
+                        <select id="authLocation" name="authLocation" class="form-input">
+                            <option value="Main Gate">Main Gate</option>
+                            <option value="Building A">Building A</option>
+                            <option value="Building B">Building B</option>
+                            <option value="Library">Library</option>
+                            <option value="Cafeteria">Cafeteria</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary w-full">Authenticate</button>
+                </form>
+            </div>
         </div>
 
         <!-- Activity Logs -->
@@ -940,40 +724,120 @@ DASHBOARD_HTML = """
             }
 
             studentList.innerHTML = students.map(student => `
-                <div class="student-item" onclick="selectStudent('${String(student.register_number)}')">
-                    <div class="font-medium">${student.full_name || ''}</div>
-                    <div class="text-sm text-muted-foreground">${String(student.register_number)}</div>
+                <div class="student-item" onclick="selectStudent('${student.register_number}')">
+                    <div class="font-medium">${student.full_name}</div>
+                    <div class="text-sm text-muted-foreground">${student.register_number}</div>
                     <div class="text-xs text-muted-foreground">${student.hostel_status} • ${student.face_embedding ? 'Face Enrolled' : 'No Face Data'}</div>
                 </div>
             `).join('');
         }
 
-        // Filter students based on search
-        function filterStudents() {
-            const searchTerm = document.getElementById('studentSearch').value.toLowerCase();
-            const filtered = allStudents.filter(student => {
-                const name = (student.full_name || '').toLowerCase();
-                const reg = String(student.register_number || '').toLowerCase();
-                return name.includes(searchTerm) || reg.includes(searchTerm);
-            });
-            displayStudents(filtered);
+        // Debounce timer for search
+        let filterTimeout = null;
+
+        // Debounced filter function to avoid excessive filtering
+        function debounceFilterStudents() {
+            if (filterTimeout) {
+                clearTimeout(filterTimeout);
+            }
+            filterTimeout = setTimeout(() => {
+                filterStudents();
+            }, 500); // Wait 500ms after typing stops for better performance
+        }
+
+        // Clear search and show all students
+        function clearSearch() {
+            const searchInput = document.getElementById('studentSearch');
+            if (searchInput) {
+                searchInput.value = '';
+                // Reload all students
+                loadStudents();
+                console.log('Search cleared, loading all students');
+            }
+        }
+
+        // Filter students based on search (using backend API)
+        async function filterStudents() {
+            const studentList = document.getElementById('studentList');
+            const searchInput = document.getElementById('studentSearch');
+            
+            if (!searchInput) {
+                console.error('Search input element not found');
+                return;
+            }
+            
+            const searchTerm = (searchInput.value || '').trim();
+            
+            // Show loading state
+            if (studentList) {
+                studentList.innerHTML = '<div class="text-center text-muted-foreground">Searching...</div>';
+            }
+            
+            // If search term is empty, show all students
+            if (searchTerm === '') {
+                await loadStudents();
+                return;
+            }
+            
+            console.log(`🔍 Searching for: "${searchTerm}"`);
+            addLog(`Searching for "${searchTerm}"...`, 'info');
+            
+            try {
+                // Call backend search API
+                const response = await fetch(`/api/students?search=${encodeURIComponent(searchTerm)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('Search API response:', data);
+                
+                if (data.success) {
+                    console.log(`✅ Found ${data.count} students matching "${searchTerm}"`);
+                    allStudents = data.students || [];
+                    displayStudents(allStudents);
+                    addLog(`Found ${data.count} student(s) matching "${searchTerm}"`, 'success');
+                } else {
+                    console.error('Search failed:', data.error);
+                    addLog('Search failed: ' + (data.error || 'Unknown error'), 'error');
+                    if (studentList) {
+                        studentList.innerHTML = '<div class="text-center text-muted-foreground">No students found</div>';
+                    }
+                }
+            } catch (apiError) {
+                console.error('API search failed, using fallback:', apiError);
+                addLog('Search API failed, using local filter', 'warning');
+                
+                // Fallback to client-side filtering
+                const filtered = allStudents.filter(student => 
+                    (student.full_name && student.full_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (student.register_number && student.register_number.toLowerCase().includes(searchTerm.toLowerCase()))
+                );
+                
+                console.log(`Filtering ${allStudents.length} students locally, found ${filtered.length} matches for "${searchTerm}"`);
+                displayStudents(filtered);
+                
+                if (filtered.length === 0) {
+                    addLog(`No students found matching "${searchTerm}"`, 'warning');
+                } else {
+                    addLog(`Found ${filtered.length} student(s) matching "${searchTerm}" (local filter)`, 'success');
+                }
+            }
         }
 
         // Select a student
         function selectStudent(registerNumber) {
-            // Normalize both sides to string for reliable matching
-            selectedStudent = allStudents.find(s => String(s.register_number) === String(registerNumber));
+            selectedStudent = allStudents.find(s => s.register_number === registerNumber);
             if (selectedStudent) {
-                document.getElementById('selectedRegisterNumber').value = String(registerNumber);
+                document.getElementById('selectedRegisterNumber').value = registerNumber;
                 document.getElementById('selectedStudentName').textContent = selectedStudent.full_name;
-                document.getElementById('selectedStudentRegister').textContent = `Register: ${String(selectedStudent.register_number)}`;
+                document.getElementById('selectedStudentRegister').textContent = `Register: ${selectedStudent.register_number}`;
                 document.getElementById('selectedStudentInfo').classList.remove('hidden');
                 
                 // Update selection in UI
                 document.querySelectorAll('.student-item').forEach(item => item.classList.remove('selected'));
-                if (window.event && window.event.target) {
-                    window.event.target.classList.add('selected');
-                }
+                event.target.classList.add('selected');
                 
                 addLog(`Selected student: ${selectedStudent.full_name} (${registerNumber})`, 'info');
             }
@@ -1074,18 +938,13 @@ DASHBOARD_HTML = """
                 });
                 
                 const result = await response.json();
-                console.log('recognize_face result:', result);
-                addLog(`Recognition response: ${result.success ? 'success' : 'failure'}${result.recognized !== undefined ? `, recognized=${result.recognized}` : ''}`, result.success ? 'info' : 'error');
                 
                 if (result.success && result.recognized) {
                     // Student recognized - log successful entry
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-green-100 border border-green-300';
                     statusDiv.textContent = `✅ Welcome ${result.student.full_name}!`;
                     detailsDiv.textContent = `${result.confidence_percentage}% match • Entry logged at ${result.location}`;
-                    // Show annotated image with bounding box
-                    if (result.annotated_image) {
-                        document.getElementById('capturedImage').src = result.annotated_image;
-                    }
+                    
                     addLog(`🎉 Welcome ${result.student.full_name}! (${result.confidence_percentage}% match)`, 'success');
                     addLog(`Entry logged at ${result.location}`, 'success');
                     loadStats(); // Refresh stats
@@ -1094,10 +953,6 @@ DASHBOARD_HTML = """
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-yellow-100 border border-yellow-300';
                     statusDiv.textContent = '⚠️ Face detected, no match found';
                     detailsDiv.textContent = `Checked ${result.students_checked} students • Best similarity: ${(result.best_similarity * 100).toFixed(1)}%`;
-                    // Show annotated image even for no-match
-                    if (result.annotated_image) {
-                        document.getElementById('capturedImage').src = result.annotated_image;
-                    }
                     
                     addLog(`👤 Face detected but no matching student found (checked ${result.students_checked} records)`, 'error');
                     if (result.best_similarity > 0) {
@@ -1106,8 +961,7 @@ DASHBOARD_HTML = """
                 } else {
                     // No face detected
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-red-100 border border-red-300';
-                    const msg = result && result.message ? result.message : 'No face detected';
-                    statusDiv.textContent = `❌ ${msg}`;
+                    statusDiv.textContent = '❌ No face detected';
                     detailsDiv.textContent = 'Please ensure your face is clearly visible and try again';
                     
                     addLog('❌ No face detected in captured image', 'error');
@@ -1203,7 +1057,29 @@ DASHBOARD_HTML = """
         });
 
         // Authentication form handler
-        // Removed - authentication functionality disabled
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/authenticate/', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLog(`Authentication successful for ${formData.get('authRegisterNumber')} (${(result.similarity * 100).toFixed(1)}% match)`, 'success');
+                    e.target.reset();
+                    loadStats();
+                } else {
+                    addLog(`Authentication failed for ${formData.get('authRegisterNumber')}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Authentication error: ${error.message}`, 'error');
+            }
+        });
 
         // Initialize dashboard
         document.addEventListener('DOMContentLoaded', () => {
@@ -1251,8 +1127,8 @@ async def register_from_dashboard(register_number: str = Form(...), file: Upload
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face, bbox = detect_face_and_bbox(image)
-        if face is None or bbox is None:
+        face = preprocess_face(image)
+        if face is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
         embedding = get_embedding(face)
@@ -1263,16 +1139,11 @@ async def register_from_dashboard(register_number: str = Form(...), file: Upload
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save face data to database")
 
-        timestamp_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(register_number), bottom_right_text=timestamp_str)
-
         return {
             "success": True, 
             "message": f"Face recognition enrolled for student {register_number}",
             "register_number": register_number,
-            "embedding_size": len(embedding),
-            "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
-            "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
+            "embedding_size": len(embedding)
         }
     except HTTPException:
         raise
@@ -1287,8 +1158,8 @@ async def register(register_number: str = Form(...), full_name: str = Form(None)
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face, bbox = detect_face_and_bbox(image)
-        if face is None or bbox is None:
+        face = preprocess_face(image)
+        if face is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
         embedding = get_embedding(face)
@@ -1299,16 +1170,11 @@ async def register(register_number: str = Form(...), full_name: str = Form(None)
         if not success:
             raise HTTPException(status_code=500, detail="Failed to save face data to database")
 
-        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(register_number), bottom_right_text=ts)
         return {
             "success": True, 
             "message": f"Student {register_number} registered successfully",
             "register_number": register_number,
-            "full_name": full_name,
-            "embedding_size": len(embedding),
-            "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
-            "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
+            "full_name": full_name
         }
     except HTTPException:
         raise
@@ -1349,8 +1215,8 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face, bbox = detect_face_and_bbox(image)
-        if face is None or bbox is None:
+        face = preprocess_face(image)
+        if face is None:
             raise HTTPException(status_code=400, detail="No face detected in the image")
 
         embedding = get_embedding(face)
@@ -1363,8 +1229,8 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         # Calculate similarity
         cosine_dist = cosine(stored_embedding, embedding)
         raw_similarity = 1 - cosine_dist
-        similarity = raw_similarity + 0.125  # Adjustment as in original code
-        threshold = 0.7
+        similarity = raw_similarity  # Adjustment as in original code
+        threshold = 0.75
         success = bool(similarity > threshold)
         
         print(f"🔐 Authentication comparison for {register_number}:")
@@ -1395,22 +1261,15 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
                 notes=f'Auto-marked via face recognition (confidence: {similarity:.2%})'
             )
             
-            # Prepare annotated response
-            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(register_number), bottom_right_text=ts)
             return {
                 "success": success, 
-                "recognized": True,
                 "similarity": float(similarity),
                 "register_number": register_number,
                 "student_name": student_info['full_name'],
                 "message": "Authentication successful",
                 "entry_logged": entry_logged,
                 "attendance_logged": attendance_logged,
-                "timestamp": datetime.now().isoformat(),
-                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
-                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None),
-                "location": location
+                "timestamp": datetime.now().isoformat()
             }
         else:
             # Log failed entry attempt
@@ -1422,17 +1281,11 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
                 location=location
             )
             
-            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S');
-            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text="Unknown", bottom_right_text=ts)
             return {
                 "success": success, 
-                "recognized": False,
                 "similarity": float(similarity),
                 "register_number": register_number,
-                "message": "Authentication failed - insufficient similarity",
-                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
-                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None),
-                "location": location
+                "message": "Authentication failed - insufficient similarity"
             }
     except HTTPException:
         raise
@@ -1674,8 +1527,8 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         nparr = np.frombuffer(img_bytes, np.uint8)
         image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        face, bbox = detect_face_and_bbox(image)
-        if face is None or bbox is None:
+        face = preprocess_face(image)
+        if face is None:
             return {
                 "success": False,
                 "message": "No face detected in the image",
@@ -1683,6 +1536,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
             }
 
         embedding = get_embedding(face)
+        
         # Get all students with face embeddings (filter at database level)
         students = get_all_students(limit=2000)
         print(f"📊 Database query results:")
@@ -1740,7 +1594,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         
         best_match = None
         best_similarity = 0.0
-        recognition_threshold = 0.5 # Threshold for face recognition
+        recognition_threshold = 0.75 # Threshold for face recognition
         
         print(f"🔍 Starting face recognition comparison...")
         print(f"   Query embedding shape: {embedding.shape}")
@@ -1799,7 +1653,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 # Calculate similarity
                 cosine_dist = cosine(stored_embedding, embedding)
                 similarity = 1 - cosine_dist
-                adjusted_similarity = similarity + 0.125 # Adjustment as in original code
+                adjusted_similarity = similarity  # Adjustment as in original code
                 
                 print(f"   Similarity calculation:")
                 print(f"     Cosine distance: {cosine_dist:.6f}")
@@ -1831,8 +1685,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
             print(f"   Confidence: {round(best_similarity * 100, 1)}%")
             print(f"   Location: {location}")
             
-            print(f"[DEBUG] Matched student: {best_match['register_number']} ({best_match['full_name']}) with similarity {best_similarity:.4f}")
-            print(f"[DEBUG] Bounding box: {bbox}")
+            # Log entry for recognized student
             entry_logged = log_entry(
                 register_number=best_match['register_number'],
                 student_name=best_match['full_name'],
@@ -1840,21 +1693,15 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 confidence_score=float(best_similarity),
                 location=location
             )
+            
             # Log attendance (mark as present)
-            try:
-                attendance_logged = log_attendance(
-                    student_id=best_match['id'],
-                    marked_by=best_match['id'],  # Self-marked for face recognition
-                    status='present',
-                    notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
-                )
-            except Exception as att_err:
-                print(f"[ERROR] Attendance logging failed: {att_err}")
-                attendance_logged = False
-            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text=str(best_match['register_number']), bottom_right_text=ts)
-            print(f"[DEBUG] Annotated image base64 length: {len(annotated_b64) if annotated_b64 else 'None'}")
-            print(f"[DEBUG] Returning bbox and annotated image in response.")
+            attendance_logged = log_attendance(
+                student_id=best_match['id'],
+                marked_by=best_match['id'],  # Self-marked for face recognition
+                status='present',
+                notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
+            )
+            
             return {
                 "success": True,
                 "recognized": True,
@@ -1868,17 +1715,9 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "location": location,
                 "entry_logged": entry_logged,
                 "attendance_logged": attendance_logged,
-                "message": f"Welcome {best_match['full_name']}! Entry logged successfully.",
-                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
-                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
+                "message": f"Welcome {best_match['full_name']}! Entry logged successfully."
             }
         else:
-            print(f"[DEBUG] No match found. Best similarity: {best_similarity:.4f}")
-            print(f"[DEBUG] Bounding box: {bbox}")
-            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            annotated_b64 = annotate_image_with_bbox(image, bbox, top_text="Unknown", bottom_right_text=ts)
-            print(f"[DEBUG] Annotated image base64 length: {len(annotated_b64) if annotated_b64 else 'None'}")
-            print(f"[DEBUG] Returning bbox and annotated image in response.")
             return {
                 "success": True,
                 "recognized": False,
@@ -1886,11 +1725,9 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "best_similarity": float(best_similarity) if best_match else 0.0,
                 "threshold": recognition_threshold,
                 "students_checked": len(students_with_faces),
-                "message": "Face detected but no matching student found in database.",
-                "bbox": {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]},
-                "annotated_image": (f"data:image/jpeg;base64,{annotated_b64}" if annotated_b64 else None)
+                "message": "Face detected but no matching student found in database."
             }
-
+            
     except Exception as e:
         return {
             "success": False,
@@ -1927,11 +1764,11 @@ async def cleanup_invalid_embeddings():
                         print(f"Failed to convert list to array for {register_number}: {e}")
                         invalid_count += 1
                         continue
-                    
+                        
                 elif isinstance(embedding_data, str):
                     # Legacy base64 encoded data - convert to JSONB list
                     embedding_bytes = decode_base64_embedding(embedding_data)
-                    if not embedding_bytes:
+                    if embedding_bytes is None:
                         print(f"Invalid base64 embedding for {register_number}")
                         invalid_count += 1
                         continue
@@ -1956,8 +1793,8 @@ async def cleanup_invalid_embeddings():
                         print(f"Failed to decode embedding for {register_number}: {e}")
                         invalid_count += 1
                         continue
-                    
-                elif isinstance(embedding_data, (bytes, bytearray)):
+                        
+                elif isinstance(embedding_data, bytes):
                     # Legacy raw bytes data - convert to JSONB list
                     try:
                         embedding = np.frombuffer(embedding_data, dtype=np.float32)
@@ -1979,14 +1816,14 @@ async def cleanup_invalid_embeddings():
                         print(f"Failed to decode raw bytes for {register_number}: {e}")
                         invalid_count += 1
                         continue
-                    
+                        
                 else:
                     print(f"Unknown embedding data type for {register_number}: {type(embedding_data)}")
                     invalid_count += 1
                     continue
-                
+                    
                 # If we get here, the embedding is valid
-                print(f"Valid embedding for {register_number}: length {len(embedding)}")
+                print(f"Valid embedding for {register_number}: shape {embedding.shape}")
         
         return {
             "success": True,
@@ -2031,182 +1868,126 @@ async def test_embedding():
         }
 
 @app.get("/api/students")
-async def get_students_endpoint(request: Request):
-    """Get students with optional server-side search. Query param: ?search=..."""
+async def get_students_endpoint(search: Optional[str] = None):
+    """Get all students from Supabase, optionally filtered by search term"""
     try:
-        search_term = request.query_params.get('search')
-        if search_term:
-            q = str(search_term).strip()
-            students: List[Dict] = []
-            # Direct register_number exact match (string)
-            try:
-                extra = supabase.table('students').select('*').eq('is_active', True).eq('register_number', q).execute()
-                students.extend(extra.data or [])
-            except Exception as e1:
-                print(f"/api/students search exact string error: {e1}")
-            # Numeric match
-            if not students and q.isdigit():
-                try:
-                    extra2 = supabase.table('students').select('*').eq('is_active', True).eq('register_number', int(q)).execute()
-                    students.extend(extra2.data or [])
-                except Exception as e2:
-                    print(f"/api/students search exact numeric error: {e2}")
-            # Partial name ilike as fallback
-            if not students:
-                try:
-                    extra3 = supabase.table('students').select('*').eq('is_active', True).ilike('full_name', f"%{q}%").limit(50).execute()
-                    students.extend(extra3.data or [])
-                except Exception as e3:
-                    print(f"/api/students search name ilike error: {e3}")
-            # Normalize
-            students = [
-                (lambda s: {**s, 'register_number': str(s.get('register_number','')).strip(), 'full_name': s.get('full_name') or ''}) (s)
-                for s in students
-            ]
+        if search and search.strip():
+            # Search with filters
+            search_term = search.strip().lower()
+            print(f"🔍 Searching for students matching: '{search_term}'")
+            
+            # Query Supabase with search filters using proper syntax
+            result = (
+                supabase.table('students')
+                .select('*')
+                .eq('is_active', True)
+                .or_(f"full_name.ilike.%{search_term}%,register_number.ilike.%{search_term}%")
+                .limit(2000)
+                .execute()
+            )
+            
+            students = result.data if result.data else []
+            print(f"✅ Found {len(students)} students matching '{search_term}'")
         else:
-            students = get_all_students_including_no_face(limit=100000)
-        # Debug: Check for specific register numbers
-        try:
-            target_regs = ["99220041253", "9920041253"]
-            regs_in_list = {str(s.get('register_number', '')).strip() for s in students}
-            print("[API /api/students] Returned students:", len(students))
-            for reg in target_regs:
-                print(f"   - present in API list ({reg}):", reg in regs_in_list)
-            # Also check in DB regardless of is_active
-            for reg in target_regs:
-                try:
-                    db_any = supabase.table('students').select('*').eq('register_number', reg).execute()
-                    db_num = None
-                    if reg.isdigit():
-                        try:
-                            db_num = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
-                        except Exception:
-                            db_num = None
-                    hits = []
-                    if db_any.data:
-                        hits.extend(db_any.data)
-                    if db_num and db_num.data:
-                        hits.extend([h for h in db_num.data if h not in hits])
-                    if hits:
-                        print(f"   - DB rows for {reg}: {len(hits)}; is_active values: {[h.get('is_active') for h in hits]}")
-                    else:
-                        print(f"   - DB rows for {reg}: 0")
-                except Exception as check_e:
-                    print(f"   - DB check error for {reg}: {check_e}")
-        except Exception as dbg_e:
-            print("[API /api/students] debug error:", dbg_e)
+            # Get all students
+            students = get_all_students_including_no_face(limit=2000)
+            print(f"📋 Retrieved all {len(students)} students")
+        
         return {
             "success": True,
             "students": students,
-            "count": len(students)
+            "count": len(students),
+            "search_term": search if search else None
         }
     except Exception as e:
+        print(f"❌ Error fetching students: {e}")
+        # Fallback: try client-side filtering if server search fails
+        if search and search.strip():
+            print("⚠️ Server-side search failed, falling back to client-side filtering")
+            try:
+                all_students = get_all_students_including_no_face(limit=2000)
+                search_term = search.strip().lower()
+                students = [
+                    s for s in all_students 
+                    if (s.get('full_name', '').lower().find(search_term) != -1 or 
+                        s.get('register_number', '').lower().find(search_term) != -1)
+                ]
+                print(f"✅ Client-side filter found {len(students)} students")
+                return {
+                    "success": True,
+                    "students": students,
+                    "count": len(students),
+                    "search_term": search
+                }
+            except Exception as fallback_error:
+                print(f"❌ Fallback also failed: {fallback_error}")
+        
         raise HTTPException(status_code=500, detail=f"Failed to fetch students: {str(e)}")
 
-@app.get("/api/find_student")
-async def api_find_student(register_number: str):
-    """Find a student by register number (string or numeric), regardless of is_active or face embedding."""
+@app.get("/api/students/search")
+async def search_students_endpoint(query: str):
+    """Search students by name or register number (dedicated search endpoint)"""
     try:
-        reg = str(register_number).strip()
-        rows = []
+        if not query or not query.strip():
+            return {
+                "success": False,
+                "error": "Search query is required",
+                "students": [],
+                "count": 0
+            }
+        
+        search_term = query.strip()
+        print(f"🔍 Searching for: '{search_term}'")
+        
+        # First try Supabase query
         try:
-            r1 = supabase.table('students').select('*').eq('register_number', reg).execute()
-            if r1.data:
-                rows.extend(r1.data)
-        except Exception:
-            pass
-        if reg.isdigit():
-            try:
-                r2 = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
-                if r2.data:
-                    rows.extend([r for r in r2.data if r not in rows])
-            except Exception:
-                pass
-        # Normalize output and add quick flags
-        out = []
-        for s in rows:
-            out.append({
-                **s,
-                'register_number': str(s.get('register_number', '')).strip(),
-                'has_face_embedding': s.get('face_embedding') is not None,
-                'is_active': s.get('is_active'),
-            })
+            result = (
+                supabase.table('students')
+                .select('*')
+                .eq('is_active', True)
+                .or_(f"full_name.ilike.%{search_term}%,register_number.ilike.%{search_term}%")
+                .limit(2000)
+                .execute()
+            )
+            students = result.data if result.data else []
+            print(f"✅ Supabase query found {len(students)} students")
+        except Exception as db_error:
+            print(f"⚠️ Supabase query failed, using client-side filter: {db_error}")
+            # Fallback to client-side filtering
+            all_students = get_all_students_including_no_face(limit=2000)
+            students = [
+                s for s in all_students 
+                if search_term in s.get('full_name', '').lower() or 
+                   search_term in s.get('register_number', '').lower()
+            ]
+            print(f"✅ Client-side filter found {len(students)} students")
+        
         return {
-            'success': True,
-            'query': reg,
-            'matches': out,
-            'count': len(out)
+            "success": True,
+            "students": students,
+            "count": len(students),
+            "query": search_term
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"find_student failed: {e}")
-
-@app.post("/api/reactivate_student")
-async def api_reactivate_student(register_number: str = Form(...)):
-    """Reactivate a student (set is_active=True). Use after find_student shows inactive."""
-    try:
-        reg = str(register_number).strip()
-        # Try string update first
-        upd1 = supabase.table('students').update({'is_active': True}).eq('register_number', reg).execute()
-        updated = (upd1.data is not None and len(upd1.data) > 0)
-        # If nothing updated and reg is numeric, try numeric eq
-        if not updated and reg.isdigit():
-            try:
-                upd2 = supabase.table('students').update({'is_active': True}).eq('register_number', int(reg)).execute()
-                updated = (upd2.data is not None and len(upd2.data) > 0)
-            except Exception:
-                pass
-        return {'success': True, 'reactivated': updated, 'register_number': reg}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"reactivate_student failed: {e}")
-
-@app.post("/api/upsert_student")
-async def api_upsert_student(register_number: str = Form(...), full_name: str = Form(None)):
-    """Ensure a student row exists and is active. Does not set face embedding."""
-    try:
-        reg = str(register_number).strip()
-        # Look for existing (string then numeric)
-        existing = supabase.table('students').select('*').eq('register_number', reg).execute()
-        if (not existing.data) and reg.isdigit():
-            try:
-                existing = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
-            except Exception:
-                pass
-        if existing.data:
-            # Update name if provided; ensure active
-            row_reg = existing.data[0]['register_number']
-            supabase.table('students').update({
-                'full_name': full_name or existing.data[0].get('full_name') or f"Student {reg}",
-                'is_active': True
-            }).eq('register_number', row_reg).execute()
-            return {'success': True, 'action': 'updated', 'register_number': str(row_reg)}
-        else:
-            # Insert new active student
-            supabase.table('students').insert({
-                'register_number': reg,
-                'full_name': full_name or f"Student {reg}",
-                'hostel_status': 'resident',
-                'is_active': True
-            }).execute()
-            return {'success': True, 'action': 'inserted', 'register_number': reg}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"upsert_student failed: {e}")
+        print(f"❌ Error searching students: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.get("/api/stats")
 async def get_dashboard_stats():
     """Get dashboard statistics"""
     try:
         # Total students
-        total_students_data = supabase.table('students').select('id', count='exact').eq('is_active', True).execute()
-        total_students = (total_students_data.count if hasattr(total_students_data, 'count') and total_students_data.count is not None else len(total_students_data.data))
+        total_students_result = supabase.table('students').select('id', count='exact').eq('is_active', True).execute()
+        total_students = total_students_result.count if hasattr(total_students_result, 'count') else len(total_students_result.data)
         
         # Today's entries
-        today = datetime.now().strftime('%Y-%m-%d')
-        today_entries_data = supabase.table('entry_logs').select('id', count='exact').gte('created_at', f"{today}T00:00:00").execute()
-        today_entries = (today_entries_data.count if hasattr(today_entries_data, 'count') and today_entries_data.count is not None else len(today_entries_data.data))
+        today = date.today().isoformat()
+        today_entries_result = supabase.table('entry_logs').select('id', count='exact').gte('created_at', f'{today}T00:00:00').execute()
+        today_entries = today_entries_result.count if hasattr(today_entries_result, 'count') else len(today_entries_result.data)
         
         # Present today
-        present_today_data = supabase.table('attendance_logs').select('id', count='exact').eq('date', today).eq('status', 'present').execute()
-        present_today = (present_today_data.count if hasattr(present_today_data, 'count') and present_today_data.count is not None else len(present_today_data.data))
+        present_today_result = supabase.table('attendance_logs').select('id', count='exact').eq('date', today).eq('status', 'present').execute()
+        present_today = present_today_result.count if hasattr(present_today_result, 'count') else len(present_today_result.data)
         
         return {
             "total_students": total_students,
@@ -2236,18 +2017,44 @@ async def get_recent_entries(limit: int = 20):
 async def get_attendance_today():
     """Get today's attendance records"""
     try:
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = date.today().isoformat()
         result = supabase.table('attendance_logs').select('*, students(register_number, full_name)').eq('date', today).execute()
         return {"success": True, "attendance": result.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get today's attendance: {str(e)}")
 
 @app.get("/debug/students")
-async def debug_students():
+async def debug_students(register_number: Optional[str] = None):
     """Debug endpoint to check student data in database"""
     try:
         print("🔍 Debug: Checking student data...")
-        students = get_all_students_including_no_face(limit=10)
+        
+        if register_number:
+            # Search for specific register number
+            print(f"🔍 Searching for register number: {register_number}")
+            result = (
+                supabase.table('students')
+                .select('*')
+                .eq('register_number', register_number)
+                .execute()
+            )
+            students = result.data if result.data else []
+            print(f"✅ Found {len(students)} students with register number '{register_number}'")
+            if students:
+                for student in students:
+                    print(f"   - {student.get('full_name')} ({student.get('register_number')}) - Active: {student.get('is_active')}")
+            else:
+                print(f"❌ No students found with register number '{register_number}'")
+                # Try to find similar
+                all_students = get_all_students_including_no_face(limit=2000)
+                similar = [s for s in all_students if register_number in s.get('register_number', '')]
+                if similar:
+                    print(f"   Found {len(similar)} similar register numbers:")
+                    for s in similar[:5]:
+                        print(f"   - {s.get('register_number')} ({s.get('full_name')})")
+        else:
+            # Get all students
+            students = get_all_students_including_no_face(limit=10)
         
         debug_info = {
             "total_students": len(students),
@@ -2265,7 +2072,7 @@ async def debug_students():
                 
                 # Track data types
                 data_type = type(face_data).__name__
-                debug_info["face_data_types"][data_type] = (debug_info["face_data_types"].get(data_type, 0) + 1)
+                debug_info["face_data_types"][data_type] = debug_info["face_data_types"].get(data_type, 0) + 1
             
             # Include first 3 students as samples
             if i < 3:
@@ -2273,8 +2080,8 @@ async def debug_students():
                     "register_number": student.get('register_number'),
                     "full_name": student.get('full_name'),
                     "has_face_data": bool(face_data),
-                    "face_data_type": type(face_data).__name__ if face_data is not None else None,
-                    "face_data_length": (len(face_data) if isinstance(face_data, (list, str, bytes, bytearray)) else None)
+                    "face_data_type": type(face_data).__name__ if face_data else None,
+                    "face_data_length": len(face_data) if isinstance(face_data, (list, str, bytes)) else None
                 }
                 
                 if isinstance(face_data, list) and len(face_data) > 0:
