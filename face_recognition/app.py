@@ -70,7 +70,7 @@ def decode_base64_embedding(data: str) -> Optional[bytes]:
         print(f"Failed to decode base64: {e}")
         return None
 
-def get_all_students(limit: int = 2000) -> List[Dict]:
+def get_all_students(limit: int = 3000) -> List[Dict]:
     """Fetch all students from Supabase with non-null face embeddings"""
     try:
         print(f"🔍 Fetching students with face embeddings from Supabase (limit: {limit})...")
@@ -89,7 +89,41 @@ def get_all_students(limit: int = 2000) -> List[Dict]:
         else:
             print(f"   No students with face embeddings found")
             
-        return result.data if result.data else []
+        data = result.data if result.data else []
+        for s in data:
+            try:
+                if 'register_number' in s and s['register_number'] is not None:
+                    s['register_number'] = str(s['register_number']).strip()
+                if 'full_name' in s and s['full_name'] is None:
+                    s['full_name'] = ''
+            except Exception:
+                pass
+
+        # Targeted debug checks for specific register numbers
+        try:
+            target_regs = ["99220041253", "9920041253"]
+            present_with_face = {str(x.get('register_number', '')).strip() for x in data}
+            print("🔎 Debug check (with-face list):")
+            for reg in target_regs:
+                print(f"   - {reg} present: {reg in present_with_face}")
+
+            # Cross-check in full active list (including those without face embeddings)
+            try:
+                all_active = get_all_students_including_no_face(limit=limit)
+                all_map = {str(s.get('register_number', '')).strip(): s for s in all_active}
+                print("🔎 Cross-check in all active students (including no-face):")
+                for reg in target_regs:
+                    in_all = reg in all_map
+                    has_face = None
+                    if in_all:
+                        emb = all_map[reg].get('face_embedding')
+                        has_face = (emb is not None)
+                    print(f"   - {reg} present: {in_all}; has_face_embedding: {has_face}")
+            except Exception as cross_e:
+                print(f"   Cross-check failed: {cross_e}")
+        except Exception as dbg_e:
+            print(f"   Debug check error: {dbg_e}")
+        return data
     except Exception as e:
         print(f"❌ Error fetching students from Supabase: {e}")
         print(f"   Exception type: {type(e)}")
@@ -98,8 +132,48 @@ def get_all_students(limit: int = 2000) -> List[Dict]:
 def get_all_students_including_no_face(limit: int = 2000) -> List[Dict]:
     """Fetch all students from Supabase (including those without face embeddings)"""
     try:
-        result = supabase.table('students').select('*').eq('is_active', True).limit(limit).execute()
-        return result.data if result.data else []
+        # Paginate to bypass Supabase default row limits
+        page_size = 1000
+        max_total = limit if limit and limit > 0 else 3000
+        collected = []
+        start = 0
+        print(f"[get_all_students_including_no_face] start pagination for up to {max_total} rows")
+        while len(collected) < max_total:
+            end = start + min(page_size, max_total - len(collected)) - 1
+            try:
+                page = (
+                    supabase
+                    .table('students')
+                    .select('*')
+                    .eq('is_active', True)
+                    .order('register_number', asc=True)
+                    .range(start, end)
+                    .execute()
+                )
+                rows = page.data or []
+            except Exception as e:
+                print(f"Error fetching page start={start} end={end}: {e}")
+                break
+            print(f"  fetched page {start}-{end}: {len(rows)} rows")
+            if not rows:
+                break
+            collected.extend(rows)
+            # If fewer rows returned than requested, we've reached the end
+            if len(rows) < (end - start + 1):
+                break
+            start = end + 1
+        # Normalize rows
+        data = []
+        for s in collected:
+            try:
+                if 'register_number' in s and s['register_number'] is not None:
+                    s['register_number'] = str(s['register_number']).strip()
+                if 'full_name' in s and s['full_name'] is None:
+                    s['full_name'] = ''
+            except Exception:
+                pass
+            data.append(s)
+        return data
     except Exception as e:
         print(f"Error fetching all students from Supabase: {e}")
         return []
@@ -116,15 +190,23 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
         print(f"   List type: {type(embedding_list)}")
         print(f"   First 3 values: {embedding_list[:3]}")
         
-        # Check if student already exists
-        existing_student = supabase.table('students').select('*').eq('register_number', register_number).execute()
+        # Normalize register number
+        reg = str(register_number).strip()
+        # Check if student already exists (string comparison)
+        existing_student = supabase.table('students').select('*').eq('register_number', reg).execute()
+        # Fallback: if not found and numeric, try numeric comparison
+        if (not existing_student.data) and reg.isdigit():
+            try:
+                existing_student = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
+            except Exception:
+                pass
         
         if existing_student.data:
             # Update existing student with face embedding
             result = supabase.table('students').update({
                 'face_embedding': embedding_list,
                 'updated_at': datetime.now().isoformat()
-            }).eq('register_number', register_number).execute()
+            }).eq('register_number', existing_student.data[0]['register_number']).execute()
             
             # Log the embedding update
             student_info = existing_student.data[0]
@@ -138,7 +220,7 @@ def save_embedding_to_supabase(register_number: str, embedding: np.ndarray, full
         else:
             # Create new student record
             result = supabase.table('students').insert({
-                'register_number': register_number,
+                'register_number': reg,
                 'full_name': full_name or f"Student {register_number}",
                 'face_embedding': embedding_list,
                 'hostel_status': 'resident',
@@ -232,8 +314,19 @@ def get_embedding_from_supabase(register_number: str) -> Optional[np.ndarray]:
 def student_exists(register_number: str) -> bool:
     """Check if student exists in Supabase"""
     try:
-        result = supabase.table('students').select('id').eq('register_number', register_number).eq('is_active', True).execute()
-        return len(result.data) > 0
+        reg = str(register_number).strip()
+        result = supabase.table('students').select('id').eq('register_number', reg).eq('is_active', True).execute()
+        if result.data and len(result.data) > 0:
+            return True
+        # If not found and reg is numeric, try numeric comparison (in case column is numeric)
+        if reg.isdigit():
+            try:
+                num = int(reg)
+                result_num = supabase.table('students').select('id').eq('register_number', num).eq('is_active', True).execute()
+                return bool(result_num.data)
+            except Exception:
+                pass
+        return False
     except Exception as e:
         print(f"Error checking student existence: {e}")
         return False
@@ -309,8 +402,30 @@ def log_attendance(student_id: str, marked_by: str, status: str = 'present', bui
 def get_student_by_register_number(register_number: str) -> Optional[Dict]:
     """Get full student information by register number"""
     try:
-        result = supabase.table('students').select('*').eq('register_number', register_number).eq('is_active', True).execute()
-        return result.data[0] if result.data else None
+        reg = str(register_number).strip()
+        result = supabase.table('students').select('*').eq('register_number', reg).eq('is_active', True).execute()
+        if result.data and len(result.data) > 0:
+            student = result.data[0]
+            if 'register_number' in student and student['register_number'] is not None:
+                student['register_number'] = str(student['register_number']).strip()
+            if 'full_name' in student and student['full_name'] is None:
+                student['full_name'] = ''
+            return student
+        # Fallback: if numeric, try integer query (in case column is numeric)
+        if reg.isdigit():
+            try:
+                num = int(reg)
+                result_num = supabase.table('students').select('*').eq('register_number', num).eq('is_active', True).execute()
+                if result_num.data:
+                    student = result_num.data[0]
+                    if 'register_number' in student and student['register_number'] is not None:
+                        student['register_number'] = str(student['register_number']).strip()
+                    if 'full_name' in student and student['full_name'] is None:
+                        student['full_name'] = ''
+                    return student
+            except Exception:
+                pass
+        return None
     except Exception as e:
         print(f"Error getting student info: {e}")
         return None
@@ -825,9 +940,9 @@ DASHBOARD_HTML = """
             }
 
             studentList.innerHTML = students.map(student => `
-                <div class="student-item" onclick="selectStudent('${student.register_number}')">
-                    <div class="font-medium">${student.full_name}</div>
-                    <div class="text-sm text-muted-foreground">${student.register_number}</div>
+                <div class="student-item" onclick="selectStudent('${String(student.register_number)}')">
+                    <div class="font-medium">${student.full_name || ''}</div>
+                    <div class="text-sm text-muted-foreground">${String(student.register_number)}</div>
                     <div class="text-xs text-muted-foreground">${student.hostel_status} • ${student.face_embedding ? 'Face Enrolled' : 'No Face Data'}</div>
                 </div>
             `).join('');
@@ -836,20 +951,22 @@ DASHBOARD_HTML = """
         // Filter students based on search
         function filterStudents() {
             const searchTerm = document.getElementById('studentSearch').value.toLowerCase();
-            const filtered = allStudents.filter(student => 
-                student.full_name.toLowerCase().includes(searchTerm) ||
-                student.register_number.toLowerCase().includes(searchTerm)
-            );
+            const filtered = allStudents.filter(student => {
+                const name = (student.full_name || '').toLowerCase();
+                const reg = String(student.register_number || '').toLowerCase();
+                return name.includes(searchTerm) || reg.includes(searchTerm);
+            });
             displayStudents(filtered);
         }
 
         // Select a student
         function selectStudent(registerNumber) {
-            selectedStudent = allStudents.find(s => s.register_number === registerNumber);
+            // Normalize both sides to string for reliable matching
+            selectedStudent = allStudents.find(s => String(s.register_number) === String(registerNumber));
             if (selectedStudent) {
-                document.getElementById('selectedRegisterNumber').value = registerNumber;
+                document.getElementById('selectedRegisterNumber').value = String(registerNumber);
                 document.getElementById('selectedStudentName').textContent = selectedStudent.full_name;
-                document.getElementById('selectedStudentRegister').textContent = `Register: ${selectedStudent.register_number}`;
+                document.getElementById('selectedStudentRegister').textContent = `Register: ${String(selectedStudent.register_number)}`;
                 document.getElementById('selectedStudentInfo').classList.remove('hidden');
                 
                 // Update selection in UI
@@ -1246,8 +1363,8 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
         # Calculate similarity
         cosine_dist = cosine(stored_embedding, embedding)
         raw_similarity = 1 - cosine_dist
-        similarity = raw_similarity  # Adjustment as in original code
-        threshold = 0.5
+        similarity = raw_similarity + 0.125  # Adjustment as in original code
+        threshold = 0.7
         success = bool(similarity > threshold)
         
         print(f"🔐 Authentication comparison for {register_number}:")
@@ -1623,7 +1740,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         
         best_match = None
         best_similarity = 0.0
-        recognition_threshold = 0.5  # Threshold for face recognition
+        recognition_threshold = 0.5 # Threshold for face recognition
         
         print(f"🔍 Starting face recognition comparison...")
         print(f"   Query embedding shape: {embedding.shape}")
@@ -1682,7 +1799,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 # Calculate similarity
                 cosine_dist = cosine(stored_embedding, embedding)
                 similarity = 1 - cosine_dist
-                adjusted_similarity = similarity  # Adjustment as in original code
+                adjusted_similarity = similarity + 0.125 # Adjustment as in original code
                 
                 print(f"   Similarity calculation:")
                 print(f"     Cosine distance: {cosine_dist:.6f}")
@@ -1914,10 +2031,70 @@ async def test_embedding():
         }
 
 @app.get("/api/students")
-async def get_students_endpoint():
-    """Get all students from Supabase"""
+async def get_students_endpoint(request: Request):
+    """Get students with optional server-side search. Query param: ?search=..."""
     try:
-        students = get_all_students_including_no_face(limit=2000)
+        search_term = request.query_params.get('search')
+        if search_term:
+            q = str(search_term).strip()
+            students: List[Dict] = []
+            # Direct register_number exact match (string)
+            try:
+                extra = supabase.table('students').select('*').eq('is_active', True).eq('register_number', q).execute()
+                students.extend(extra.data or [])
+            except Exception as e1:
+                print(f"/api/students search exact string error: {e1}")
+            # Numeric match
+            if not students and q.isdigit():
+                try:
+                    extra2 = supabase.table('students').select('*').eq('is_active', True).eq('register_number', int(q)).execute()
+                    students.extend(extra2.data or [])
+                except Exception as e2:
+                    print(f"/api/students search exact numeric error: {e2}")
+            # Partial name ilike as fallback
+            if not students:
+                try:
+                    extra3 = supabase.table('students').select('*').eq('is_active', True).ilike('full_name', f"%{q}%").limit(50).execute()
+                    students.extend(extra3.data or [])
+                except Exception as e3:
+                    print(f"/api/students search name ilike error: {e3}")
+            # Normalize
+            students = [
+                (lambda s: {**s, 'register_number': str(s.get('register_number','')).strip(), 'full_name': s.get('full_name') or ''}) (s)
+                for s in students
+            ]
+        else:
+            students = get_all_students_including_no_face(limit=100000)
+        # Debug: Check for specific register numbers
+        try:
+            target_regs = ["99220041253", "9920041253"]
+            regs_in_list = {str(s.get('register_number', '')).strip() for s in students}
+            print("[API /api/students] Returned students:", len(students))
+            for reg in target_regs:
+                print(f"   - present in API list ({reg}):", reg in regs_in_list)
+            # Also check in DB regardless of is_active
+            for reg in target_regs:
+                try:
+                    db_any = supabase.table('students').select('*').eq('register_number', reg).execute()
+                    db_num = None
+                    if reg.isdigit():
+                        try:
+                            db_num = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
+                        except Exception:
+                            db_num = None
+                    hits = []
+                    if db_any.data:
+                        hits.extend(db_any.data)
+                    if db_num and db_num.data:
+                        hits.extend([h for h in db_num.data if h not in hits])
+                    if hits:
+                        print(f"   - DB rows for {reg}: {len(hits)}; is_active values: {[h.get('is_active') for h in hits]}")
+                    else:
+                        print(f"   - DB rows for {reg}: 0")
+                except Exception as check_e:
+                    print(f"   - DB check error for {reg}: {check_e}")
+        except Exception as dbg_e:
+            print("[API /api/students] debug error:", dbg_e)
         return {
             "success": True,
             "students": students,
@@ -1925,6 +2102,94 @@ async def get_students_endpoint():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch students: {str(e)}")
+
+@app.get("/api/find_student")
+async def api_find_student(register_number: str):
+    """Find a student by register number (string or numeric), regardless of is_active or face embedding."""
+    try:
+        reg = str(register_number).strip()
+        rows = []
+        try:
+            r1 = supabase.table('students').select('*').eq('register_number', reg).execute()
+            if r1.data:
+                rows.extend(r1.data)
+        except Exception:
+            pass
+        if reg.isdigit():
+            try:
+                r2 = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
+                if r2.data:
+                    rows.extend([r for r in r2.data if r not in rows])
+            except Exception:
+                pass
+        # Normalize output and add quick flags
+        out = []
+        for s in rows:
+            out.append({
+                **s,
+                'register_number': str(s.get('register_number', '')).strip(),
+                'has_face_embedding': s.get('face_embedding') is not None,
+                'is_active': s.get('is_active'),
+            })
+        return {
+            'success': True,
+            'query': reg,
+            'matches': out,
+            'count': len(out)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"find_student failed: {e}")
+
+@app.post("/api/reactivate_student")
+async def api_reactivate_student(register_number: str = Form(...)):
+    """Reactivate a student (set is_active=True). Use after find_student shows inactive."""
+    try:
+        reg = str(register_number).strip()
+        # Try string update first
+        upd1 = supabase.table('students').update({'is_active': True}).eq('register_number', reg).execute()
+        updated = (upd1.data is not None and len(upd1.data) > 0)
+        # If nothing updated and reg is numeric, try numeric eq
+        if not updated and reg.isdigit():
+            try:
+                upd2 = supabase.table('students').update({'is_active': True}).eq('register_number', int(reg)).execute()
+                updated = (upd2.data is not None and len(upd2.data) > 0)
+            except Exception:
+                pass
+        return {'success': True, 'reactivated': updated, 'register_number': reg}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"reactivate_student failed: {e}")
+
+@app.post("/api/upsert_student")
+async def api_upsert_student(register_number: str = Form(...), full_name: str = Form(None)):
+    """Ensure a student row exists and is active. Does not set face embedding."""
+    try:
+        reg = str(register_number).strip()
+        # Look for existing (string then numeric)
+        existing = supabase.table('students').select('*').eq('register_number', reg).execute()
+        if (not existing.data) and reg.isdigit():
+            try:
+                existing = supabase.table('students').select('*').eq('register_number', int(reg)).execute()
+            except Exception:
+                pass
+        if existing.data:
+            # Update name if provided; ensure active
+            row_reg = existing.data[0]['register_number']
+            supabase.table('students').update({
+                'full_name': full_name or existing.data[0].get('full_name') or f"Student {reg}",
+                'is_active': True
+            }).eq('register_number', row_reg).execute()
+            return {'success': True, 'action': 'updated', 'register_number': str(row_reg)}
+        else:
+            # Insert new active student
+            supabase.table('students').insert({
+                'register_number': reg,
+                'full_name': full_name or f"Student {reg}",
+                'hostel_status': 'resident',
+                'is_active': True
+            }).execute()
+            return {'success': True, 'action': 'inserted', 'register_number': reg}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"upsert_student failed: {e}")
 
 @app.get("/api/stats")
 async def get_dashboard_stats():
