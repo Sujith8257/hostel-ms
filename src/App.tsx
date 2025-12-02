@@ -26,6 +26,11 @@ import { RoomManagementPage } from '@/pages/RoomManagementPage';
 import { StudentsPage } from '@/pages/StudentsPage';
 import { StudentsDetailsPage } from '@/pages/StudentsDetailsPage';
 import { EntryExitLogsPage } from '@/pages/EntryExitLogsPage';
+// Warden-specific Pages
+import { StudentsPage as WardenStudentsPage } from '@/pages/WardenStudents';
+import { EntryExitLogsPage as WardenLogsPage } from '@/pages/WardenLogs';
+import { AlertsPage as WardenAlertsPage } from '@/pages/WardenAlerts';
+import { HelpPage as WardenHelpPage } from '@/pages/WardenHelp';
 import { useTokenRefresh } from '@/hooks/useTokenRefresh';
 import { Toaster } from "@/components/ui/sonner"
 import './App.css';
@@ -66,6 +71,11 @@ function AppContent() {
         <Route path="/student-help" element={<StudentHelpPage />} />
         <Route path="/warden" element={<WardenDashboard />} />
         
+        {/* Warden-specific Pages */}
+        <Route path="/warden/students" element={<WardenStudentsPage />} />
+        <Route path="/warden/entries" element={<WardenLogsPage />} />
+        <Route path="/warden/alerts" element={<WardenAlertsPage />} />
+        <Route path="/warden/help" element={<WardenHelpPage />} />
         
         {/* Management Pages */}
         <Route path="/students" element={<StudentsPage />} />
