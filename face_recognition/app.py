@@ -269,6 +269,29 @@ def log_entry(register_number: str, student_name: str, entry_type: str = 'entry'
         print(f"Error logging entry: {e}")
         return False
 
+def log_entry_no_student(register_number: str, student_name: str, entry_type: str = 'failed_attempt', confidence_score: float = None, image_url: str = None, location: str = 'Main Gate') -> bool:
+    """Log entry to entry_logs table when no student is found (e.g., face detected but no match)"""
+    try:
+        # Insert entry log without student_id (allows NULL)
+        entry_data = {
+            'student_id': None,  # NULL for unknown students
+            'register_number': register_number,
+            'student_name': student_name,
+            'entry_type': entry_type,
+            'confidence_score': confidence_score,
+            'image_url': image_url,
+            'location': location,
+            'timestamp': datetime.now().isoformat(),
+            'created_at': datetime.now().isoformat()
+        }
+        
+        result = supabase.table('entry_logs').insert(entry_data).execute()
+        print(f"✅ Logged failed attempt: {student_name} at {location}")
+        return True
+    except Exception as e:
+        print(f"Error logging entry (no student): {e}")
+        return False
+
 def log_attendance(student_id: str, marked_by: str, status: str = 'present', building_id: str = None, floor_number: int = None, notes: str = None) -> bool:
     """Log attendance to attendance_logs table"""
     try:
@@ -438,10 +461,16 @@ DASHBOARD_HTML = """
             transition: all 0.3s ease;
         }
 
-        .btn-primary:hover {
-            background-color: #b05730;
-            transform: translateY(-2px);
-        }
+         .btn-primary:hover:not(:disabled) {
+             background-color: #b05730;
+             transform: translateY(-2px);
+         }
+         
+         .btn-primary:disabled {
+             background-color: #d4a574;
+             cursor: not-allowed;
+             opacity: 0.6;
+         }
 
         .btn-secondary {
             background-color: var(--secondary);
@@ -610,10 +639,27 @@ DASHBOARD_HTML = """
                     
                     <div>
                         <label class="block text-sm font-medium mb-2">Face Image:</label>
-                        <input type="file" id="imageFile" name="imageFile" accept="image/*" class="form-input">
+                        <button type="button" id="takeFaceIdBtn" class="btn-primary w-full">📷 Take Face ID</button>
                     </div>
                     
-                    <button type="submit" class="btn-primary w-full">Register Face Embedding</button>
+                    <!-- Camera Preview for Registration -->
+                    <div id="registrationCameraPreview" class="hidden">
+                        <video id="registrationVideo" autoplay playsinline class="w-full rounded-lg mb-2" style="max-height: 200px;"></video>
+                        <canvas id="registrationCanvas" style="display: none;"></canvas>
+                        <div class="flex gap-2 mb-2">
+                            <button type="button" id="captureRegistrationPhoto" class="btn-primary flex-1">Capture Photo</button>
+                            <button type="button" id="cancelRegistrationCapture" class="btn-secondary flex-1">Cancel</button>
+                        </div>
+                        <div id="registrationPhotoPreview" class="hidden mb-2">
+                            <img id="registrationCapturedImage" class="w-full rounded-lg" style="max-height: 200px;">
+                            <div class="flex gap-2 mt-2">
+                                <button type="button" id="retakePhoto" class="btn-secondary flex-1">Retake</button>
+                                <button type="button" id="useCapturedPhoto" class="btn-primary flex-1">Use This Photo</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary w-full" id="registerBtn" disabled>Register Face Embedding</button>
                 </form>
             </div>
 
@@ -634,6 +680,15 @@ DASHBOARD_HTML = """
                     </select>
                 </div>
                 
+                <!-- Entry/Exit Type Selector -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Entry/Exit Type:</label>
+                    <select id="entryType" class="form-input">
+                        <option value="entry" selected>Entry</option>
+                        <option value="exit">Exit</option>
+                    </select>
+                </div>
+                
                 <div class="video-container mb-4">
                     <video id="videoElement" autoplay playsinline class="w-full"></video>
                     <canvas id="captureCanvas" style="display: none;"></canvas>
@@ -641,17 +696,13 @@ DASHBOARD_HTML = """
 
                 <div class="space-y-3">
                     <button id="startCamera" class="btn-primary w-full">Start Camera</button>
-                    <button id="takePhoto" class="btn-secondary w-full" style="display:none;">Capture & Recognize</button>
-                    <button id="usePhotoForRegistration" class="btn-primary w-full" style="display:none;">Use Photo for Registration</button>
+                    <button id="stopCamera" class="btn-secondary w-full" style="display:none;">Stop Camera</button>
                 </div>
 
-                <!-- Captured Photo Preview -->
-                <div id="photoPreview" class="mt-4 hidden">
-                    <img id="capturedImage" class="w-full rounded-lg">
-                    <div id="recognitionResult" class="mt-2 p-3 rounded-lg hidden">
-                        <div id="recognitionStatus" class="font-medium"></div>
-                        <div id="recognitionDetails" class="text-sm mt-1"></div>
-                    </div>
+                <!-- Recognition Result -->
+                <div id="recognitionResult" class="mt-4 p-3 rounded-lg hidden">
+                    <div id="recognitionStatus" class="font-medium"></div>
+                    <div id="recognitionDetails" class="text-sm mt-1"></div>
                 </div>
             </div>
 
@@ -697,6 +748,9 @@ DASHBOARD_HTML = """
 
     <script>
         let stream = null;
+        let captureInterval = null;
+        let registrationStream = null;
+        let registrationPhotoBlob = null;
         let allStudents = [];
         let selectedStudent = null;
         let capturedPhotoBlob = null;
@@ -874,7 +928,7 @@ DASHBOARD_HTML = """
             }
         }
 
-        // Camera functionality
+        // Camera functionality - Auto capture every 5 seconds
         document.getElementById('startCamera').addEventListener('click', async () => {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ 
@@ -882,35 +936,61 @@ DASHBOARD_HTML = """
                 });
                 document.getElementById('videoElement').srcObject = stream;
                 document.getElementById('startCamera').style.display = 'none';
-                document.getElementById('takePhoto').style.display = 'block';
-                addLog('Camera started successfully', 'success');
+                document.getElementById('stopCamera').style.display = 'block';
+                addLog('Camera started');
+                
+                // Start automatic capture every 5 seconds
+                captureInterval = setInterval(async () => {
+                    await captureAndRecognize();
+                }, 5000); // 5000ms = 5 seconds
+                
+                // Also capture immediately
+                await captureAndRecognize();
             } catch (error) {
                 addLog(`Camera error: ${error.message}`, 'error');
             }
         });
 
-        // Take photo from camera
-        document.getElementById('takePhoto').addEventListener('click', () => {
+        // Stop camera functionality
+        document.getElementById('stopCamera').addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (captureInterval) {
+                clearInterval(captureInterval);
+                captureInterval = null;
+            }
+            document.getElementById('videoElement').srcObject = null;
+            document.getElementById('startCamera').style.display = 'block';
+            document.getElementById('stopCamera').style.display = 'none';
+            document.getElementById('recognitionResult').classList.add('hidden');
+            addLog('Camera stopped', 'info');
+        });
+
+        // Auto capture and recognize function
+        async function captureAndRecognize() {
             const video = document.getElementById('videoElement');
             const canvas = document.getElementById('captureCanvas');
-            const ctx = canvas.getContext('2d');
             
+            if (!video || !video.videoWidth || !video.videoHeight) {
+                return; // Video not ready
+            }
+            
+            const ctx = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0);
             
             canvas.toBlob(async (blob) => {
-                capturedPhotoBlob = blob;
-                const imageUrl = URL.createObjectURL(blob);
-                document.getElementById('capturedImage').src = imageUrl;
-                document.getElementById('photoPreview').classList.remove('hidden');
-                document.getElementById('usePhotoForRegistration').style.display = 'block';
-                addLog('Photo captured successfully', 'success');
-                
-                // Automatically recognize face and log entry
-                await recognizeCapturedFace(blob);
+                if (blob) {
+                    capturedPhotoBlob = blob;
+                    
+                    // Automatically recognize face and log entry/exit
+                    await recognizeCapturedFace(blob);
+                }
             }, 'image/jpeg', 0.8);
-        });
+        }
 
         // Recognize captured face and log entry
         async function recognizeCapturedFace(photoBlob) {
@@ -918,6 +998,7 @@ DASHBOARD_HTML = """
                 addLog('Analyzing captured face...', 'info');
                 
                 const selectedLocation = document.getElementById('cameraLocation').value;
+                const selectedEntryType = document.getElementById('entryType').value;
                 const resultDiv = document.getElementById('recognitionResult');
                 const statusDiv = document.getElementById('recognitionStatus');
                 const detailsDiv = document.getElementById('recognitionDetails');
@@ -931,6 +1012,7 @@ DASHBOARD_HTML = """
                 const formData = new FormData();
                 formData.append('file', photoBlob, 'capture.jpg');
                 formData.append('location', selectedLocation);
+                formData.append('entry_type', selectedEntryType);
                 
                 const response = await fetch('/recognize_face/', {
                     method: 'POST',
@@ -940,10 +1022,11 @@ DASHBOARD_HTML = """
                 const result = await response.json();
                 
                 if (result.success && result.recognized) {
-                    // Student recognized - log successful entry
+                    // Student recognized - log successful entry/exit
+                    const entryTypeText = selectedEntryType === 'entry' ? 'Entry' : 'Exit';
                     resultDiv.className = 'mt-2 p-3 rounded-lg bg-green-100 border border-green-300';
                     statusDiv.textContent = `✅ Welcome ${result.student.full_name}!`;
-                    detailsDiv.textContent = `${result.confidence_percentage}% match • Entry logged at ${result.location}`;
+                    detailsDiv.textContent = `${result.confidence_percentage}% match • ${entryTypeText} logged at ${result.location}`;
                     
                     addLog(`🎉 Welcome ${result.student.full_name}! (${result.confidence_percentage}% match)`, 'success');
                     addLog(`Entry logged at ${result.location}`, 'success');
@@ -981,21 +1064,22 @@ DASHBOARD_HTML = """
         }
 
         // Use captured photo for registration
-        document.getElementById('usePhotoForRegistration').addEventListener('click', () => {
-            if (!selectedStudent) {
-                addLog('Please select a student first', 'error');
-                return;
-            }
-            
-            if (!capturedPhotoBlob) {
-                addLog('Please capture a photo first', 'error');
-                return;
-            }
-            
-            // Create a file from the blob and submit
-            const file = new File([capturedPhotoBlob], 'capture.jpg', { type: 'image/jpeg' });
-            registerWithPhoto(file);
-        });
+        // Removed: Use Photo for Registration button functionality (button no longer displayed)
+        // document.getElementById('usePhotoForRegistration').addEventListener('click', () => {
+        //     if (!selectedStudent) {
+        //         addLog('Please select a student first', 'error');
+        //         return;
+        //     }
+        //     
+        //     if (!capturedPhotoBlob) {
+        //         addLog('Please capture a photo first', 'error');
+        //         return;
+        //     }
+        //     
+        //     // Create a file from the blob and submit
+        //     const file = new File([capturedPhotoBlob], 'capture.jpg', { type: 'image/jpeg' });
+        //     registerWithPhoto(file);
+        // });
 
         // Register with photo
         async function registerWithPhoto(file) {
@@ -1023,6 +1107,100 @@ DASHBOARD_HTML = """
             }
         }
 
+        // Take Face ID button handler
+        document.getElementById('takeFaceIdBtn').addEventListener('click', async () => {
+            if (!selectedStudent) {
+                addLog('Please select a student first', 'error');
+                return;
+            }
+            
+            try {
+                // Start camera for registration
+                registrationStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                document.getElementById('registrationVideo').srcObject = registrationStream;
+                document.getElementById('registrationCameraPreview').classList.remove('hidden');
+                document.getElementById('takeFaceIdBtn').style.display = 'none';
+                addLog('Camera started for face ID capture. Position face and click Capture Photo', 'info');
+            } catch (error) {
+                addLog(`Camera error: ${error.message}`, 'error');
+            }
+        });
+        
+        // Capture photo for registration
+        document.getElementById('captureRegistrationPhoto').addEventListener('click', () => {
+            const video = document.getElementById('registrationVideo');
+            const canvas = document.getElementById('registrationCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            canvas.toBlob(async (blob) => {
+                if (blob) {
+                    registrationPhotoBlob = blob;
+                    const imageUrl = URL.createObjectURL(blob);
+                    document.getElementById('registrationCapturedImage').src = imageUrl;
+                    document.getElementById('registrationPhotoPreview').classList.remove('hidden');
+                    document.getElementById('captureRegistrationPhoto').style.display = 'none';
+                    document.getElementById('cancelRegistrationCapture').style.display = 'none';
+                    
+                    // Stop camera
+                    if (registrationStream) {
+                        registrationStream.getTracks().forEach(track => track.stop());
+                        registrationStream = null;
+                    }
+                    document.getElementById('registrationVideo').srcObject = null;
+                    
+                    addLog('Photo captured. Click "Use This Photo" to register or "Retake" to capture again', 'success');
+                }
+            }, 'image/jpeg', 0.8);
+        });
+        
+        // Cancel registration capture
+        document.getElementById('cancelRegistrationCapture').addEventListener('click', () => {
+            if (registrationStream) {
+                registrationStream.getTracks().forEach(track => track.stop());
+                registrationStream = null;
+            }
+            document.getElementById('registrationVideo').srcObject = null;
+            document.getElementById('registrationCameraPreview').classList.add('hidden');
+            document.getElementById('registrationPhotoPreview').classList.add('hidden');
+            document.getElementById('takeFaceIdBtn').style.display = 'block';
+            registrationPhotoBlob = null;
+            document.getElementById('registerBtn').disabled = true;
+            addLog('Registration capture cancelled', 'info');
+        });
+        
+        // Retake photo
+        document.getElementById('retakePhoto').addEventListener('click', async () => {
+            registrationPhotoBlob = null;
+            document.getElementById('registrationPhotoPreview').classList.add('hidden');
+            document.getElementById('registerBtn').disabled = true;
+            
+            try {
+                registrationStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                document.getElementById('registrationVideo').srcObject = registrationStream;
+                document.getElementById('captureRegistrationPhoto').style.display = 'block';
+                document.getElementById('cancelRegistrationCapture').style.display = 'block';
+                addLog('Ready to capture again', 'info');
+            } catch (error) {
+                addLog(`Camera error: ${error.message}`, 'error');
+            }
+        });
+        
+        // Use captured photo
+        document.getElementById('useCapturedPhoto').addEventListener('click', () => {
+            if (registrationPhotoBlob) {
+                document.getElementById('registerBtn').disabled = false;
+                addLog('Photo selected. Click "Register Face Embedding" to complete registration', 'success');
+            }
+        });
+        
         // Register form handler
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1032,10 +1210,18 @@ DASHBOARD_HTML = """
                 return;
             }
             
-            const formData = new FormData(e.target);
-            formData.set('register_number', selectedStudent.register_number);
+            if (!registrationPhotoBlob) {
+                addLog('Please capture a face ID first', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            const file = new File([registrationPhotoBlob], 'face_id.jpg', { type: 'image/jpeg' });
+            formData.append('register_number', selectedStudent.register_number);
+            formData.append('file', file);
             
             try {
+                addLog(`Registering face for ${selectedStudent.full_name}...`, 'info');
                 const response = await fetch('/register_from_dashboard/', {
                     method: 'POST',
                     body: formData
@@ -1045,7 +1231,17 @@ DASHBOARD_HTML = """
                 
                 if (result.success) {
                     addLog(`Face embedding registered for ${selectedStudent.full_name}`, 'success');
-                    e.target.reset();
+                    // Reset form
+                    document.getElementById('registerForm').reset();
+                    document.getElementById('registrationCameraPreview').classList.add('hidden');
+                    document.getElementById('registrationPhotoPreview').classList.add('hidden');
+                    document.getElementById('takeFaceIdBtn').style.display = 'block';
+                    document.getElementById('registerBtn').disabled = true;
+                    registrationPhotoBlob = null;
+                    if (registrationStream) {
+                        registrationStream.getTracks().forEach(track => track.stop());
+                        registrationStream = null;
+                    }
                     loadStats();
                     loadStudents(); // Refresh student list
                 } else {
@@ -1520,8 +1716,8 @@ async def capture_and_register(register_number: str = Form(...), file: UploadFil
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @app.post("/recognize_face/")
-async def recognize_face(file: UploadFile = File(...), location: str = Form('Main Gate')):
-    """Recognize face from photo and log entry if match found"""
+async def recognize_face(file: UploadFile = File(...), location: str = Form('Main Gate'), entry_type: str = Form('entry')):
+    """Recognize face from photo and log entry/exit if match found"""
     try:
         img_bytes = await file.read()
         nparr = np.frombuffer(img_bytes, np.uint8)
@@ -1679,17 +1875,21 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
         print(f"   Match found: {best_match is not None and best_similarity > recognition_threshold}")
         
         if best_match and best_similarity > recognition_threshold:
+            # Validate entry_type (default to 'entry' if invalid)
+            valid_entry_type = entry_type if entry_type in ['entry', 'exit'] else 'entry'
+            
             print(f"✅ STUDENT RECOGNIZED:")
             print(f"   Name: {best_match['full_name']}")
             print(f"   Register Number: {best_match['register_number']}")
+            print(f"   Type: {valid_entry_type.upper()}")
             print(f"   Confidence: {round(best_similarity * 100, 1)}%")
             print(f"   Location: {location}")
             
-            # Log entry for recognized student
+            # Log entry/exit for recognized student
             entry_logged = log_entry(
                 register_number=best_match['register_number'],
                 student_name=best_match['full_name'],
-                entry_type='entry',
+                entry_type=valid_entry_type,
                 confidence_score=float(best_similarity),
                 location=location
             )
@@ -1702,6 +1902,7 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
             )
             
+            entry_type_display = valid_entry_type.capitalize()
             return {
                 "success": True,
                 "recognized": True,
@@ -1713,11 +1914,22 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "similarity": float(best_similarity),
                 "confidence_percentage": round(best_similarity * 100, 1),
                 "location": location,
+                "entry_type": valid_entry_type,
                 "entry_logged": entry_logged,
                 "attendance_logged": attendance_logged,
-                "message": f"Welcome {best_match['full_name']}! Entry logged successfully."
+                "message": f"Welcome {best_match['full_name']}! {entry_type_display} logged successfully."
             }
         else:
+            # Log failed attempt (face detected but no match found)
+            # Use special values since we don't have a student_id
+            log_entry_no_student(
+                register_number="UNKNOWN",
+                student_name="Face detected, no match found",
+                entry_type='failed_attempt',
+                confidence_score=float(best_similarity) if best_match else 0.0,
+                location=location
+            )
+            
             return {
                 "success": True,
                 "recognized": False,

@@ -54,6 +54,7 @@ interface EntryLogStats {
   totalToday: number;
   successfulToday: number;
   failedToday: number;
+  totalFailed: number;
   uniqueStudentsToday: number;
   averageConfidence: number;
   lastEntry: string | null;
@@ -77,18 +78,74 @@ export function EntryExitLogsPage() {
     totalToday: 0,
     successfulToday: 0,
     failedToday: 0,
+    totalFailed: 0,
     uniqueStudentsToday: 0,
     averageConfidence: 0,
     lastEntry: null,
   });
+
+  // Helper function to check if a log entry is a failed attempt
+  const isFailedAttempt = useCallback((log: EntryLog): boolean => {
+    // Check if entry_type is explicitly failed_attempt
+    if (log.entry_type === 'failed_attempt') {
+      return true;
+    }
+    
+    // Check if student_name contains failure indicators (comprehensive check)
+    const nameLower = (log.student_name || '').toLowerCase().trim();
+    if (nameLower) {
+      // Check for various patterns
+      if (nameLower.includes('face detected') && nameLower.includes('no match')) {
+        return true;
+      }
+      if (nameLower.includes('face detected, no match found')) {
+        return true;
+      }
+      if (nameLower.includes('face detected but no match')) {
+        return true;
+      }
+      if (nameLower.includes('no match found')) {
+        return true;
+      }
+      if (nameLower.includes('no matching student')) {
+        return true;
+      }
+      if (nameLower.includes('face detected') && (nameLower.includes('match') || nameLower.includes('found'))) {
+        return true;
+      }
+    }
+    
+    // Check if register_number contains failure indicators
+    const regLower = (log.register_number || '').toLowerCase().trim();
+    if (regLower) {
+      if (regLower.includes('no match') || 
+          regLower.includes('failed') ||
+          (regLower.includes('face') && regLower.includes('detected'))) {
+        return true;
+      }
+    }
+    
+    // Also check if confidence_score is very low (might indicate failure)
+    if (log.confidence_score !== null && log.confidence_score < 0.3) {
+      // Low confidence might indicate a failed attempt, but only if other indicators are present
+      if (nameLower.includes('face') || regLower.includes('match')) {
+        return true;
+      }
+    }
+    
+    return false;
+  }, []);
 
   const calculateStats = useCallback(() => {
     const today = new Date().toDateString();
     const todayLogs = logs.filter(log => new Date(log.timestamp).toDateString() === today);
     
     const totalToday = todayLogs.length;
-    const successfulToday = todayLogs.filter(log => log.entry_type !== 'failed_attempt').length;
-    const failedToday = todayLogs.filter(log => log.entry_type === 'failed_attempt').length;
+    const successfulToday = todayLogs.filter(log => !isFailedAttempt(log)).length;
+    const failedToday = todayLogs.filter(log => isFailedAttempt(log)).length;
+    
+    // Calculate total failed attempts (all time)
+    const totalFailed = logs.filter(log => isFailedAttempt(log)).length;
     
     const uniqueStudents = new Set(todayLogs.map(log => log.register_number));
     const uniqueStudentsToday = uniqueStudents.size;
@@ -107,11 +164,12 @@ export function EntryExitLogsPage() {
       totalToday,
       successfulToday,
       failedToday,
+      totalFailed,
       uniqueStudentsToday,
       averageConfidence,
       lastEntry,
     });
-  }, [logs]);
+  }, [logs, isFailedAttempt]);
 
   const filterLogs = useCallback(() => {
     let filtered = logs;
@@ -153,7 +211,15 @@ export function EntryExitLogsPage() {
 
     // Apply entry type filter
     if (entryTypeFilter !== 'all') {
-      filtered = filtered.filter(log => log.entry_type === entryTypeFilter);
+      if (entryTypeFilter === 'failed_attempt') {
+        // Filter for failed attempts (including "no match found" cases)
+        filtered = filtered.filter(log => isFailedAttempt(log));
+      } else {
+        // Filter for successful entry/exit (exclude failed attempts)
+        filtered = filtered.filter(log => 
+          log.entry_type === entryTypeFilter && !isFailedAttempt(log)
+        );
+      }
     }
 
     // Apply location filter
@@ -162,7 +228,7 @@ export function EntryExitLogsPage() {
     }
 
     setFilteredLogs(filtered);
-  }, [logs, searchTerm, entryTypeFilter, locationFilter, dateFilter]);
+  }, [logs, searchTerm, entryTypeFilter, locationFilter, dateFilter, isFailedAttempt]);
 
   // Load data on component mount
   useEffect(() => {
@@ -200,6 +266,41 @@ export function EntryExitLogsPage() {
         );
         setLogs(sortedLogs);
         console.log(`Loaded ${sortedLogs.length} entry logs`);
+        
+        // Debug: Log ALL entries to see what we're working with
+        console.log('Sample of first 5 entries:', sortedLogs.slice(0, 5).map(log => ({
+          id: log.id,
+          student_name: log.student_name,
+          register_number: log.register_number,
+          entry_type: log.entry_type,
+          confidence_score: log.confidence_score
+        })));
+        
+        // Debug: Log entries that might be "no match found" cases
+        const noMatchLogs = sortedLogs.filter(log => {
+          const nameLower = (log.student_name || '').toLowerCase();
+          const regLower = (log.register_number || '').toLowerCase();
+          return nameLower.includes('face') || nameLower.includes('match') || 
+                 regLower.includes('face') || regLower.includes('match') ||
+                 log.entry_type === 'failed_attempt';
+        });
+        if (noMatchLogs.length > 0) {
+          console.log(`Found ${noMatchLogs.length} potential "no match found" entries:`, noMatchLogs.map(log => {
+            const nameLower = (log.student_name || '').toLowerCase();
+            const regLower = (log.register_number || '').toLowerCase();
+            const isFailed = log.entry_type === 'failed_attempt' ||
+              (nameLower.includes('face detected') && nameLower.includes('no match')) ||
+              nameLower.includes('no match found') ||
+              regLower.includes('no match');
+            return {
+              student_name: log.student_name,
+              register_number: log.register_number,
+              entry_type: log.entry_type,
+              confidence_score: log.confidence_score,
+              isFailed: isFailed
+            };
+          }));
+        }
       } else {
         throw new Error(data.error || 'Failed to load entry logs');
       }
@@ -214,8 +315,19 @@ export function EntryExitLogsPage() {
     }
   };
 
-  const getEntryTypeBadge = (entryType: string) => {
-    switch (entryType) {
+  const getEntryTypeBadge = (log: EntryLog) => {
+    // Check if this is a failed attempt (including "no match found" cases)
+    if (isFailedAttempt(log)) {
+      return (
+        <Badge className="bg-red-100 text-red-800">
+          <XCircle className="h-3 w-3 mr-1" />
+          Failed
+        </Badge>
+      );
+    }
+    
+    // Check entry_type for successful attempts
+    switch (log.entry_type) {
       case 'entry':
         return (
           <Badge className="bg-green-100 text-green-800">
@@ -230,17 +342,10 @@ export function EntryExitLogsPage() {
             Exit
           </Badge>
         );
-      case 'failed_attempt':
-        return (
-          <Badge className="bg-red-100 text-red-800">
-            <XCircle className="h-3 w-3 mr-1" />
-            Failed
-          </Badge>
-        );
       default:
         return (
           <Badge variant="outline">
-            {entryType}
+            {log.entry_type}
           </Badge>
         );
     }
@@ -663,7 +768,7 @@ export function EntryExitLogsPage() {
                   <div className="p-1 bg-muted rounded-full">
                     <User className="h-4 w-4" />
                   </div>
-                  <Badge variant="secondary">Administrator</Badge>
+                    <Badge variant="secondary">Warden</Badge>
                   <span className="text-sm text-muted-foreground">AU4</span>
                 </div>
               </div>
@@ -723,13 +828,13 @@ export function EntryExitLogsPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Failed</CardTitle>
+              <CardTitle className="text-sm font-medium">Failed Attempts</CardTitle>
               <XCircle className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{stats.failedToday}</div>
               <p className="text-xs text-muted-foreground">
-                Failed attempts
+                Today ({stats.totalFailed} total)
               </p>
             </CardContent>
           </Card>
@@ -913,7 +1018,7 @@ export function EntryExitLogsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {getEntryTypeBadge(log.entry_type)}
+                            {getEntryTypeBadge(log)}
                           </TableCell>
                           <TableCell>
                             {getConfidenceBadge(log.confidence_score)}

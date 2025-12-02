@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,12 +27,27 @@ import {
   Building2,
   UserPlus
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+
+const FACE_RECOGNITION_API_BASE = 'http://localhost:8005';
+
+interface EntryLog {
+  id: string;
+  student_id: string | null;
+  register_number: string;
+  student_name: string;
+  entry_type: 'entry' | 'exit' | 'failed_attempt';
+  timestamp: string;
+  confidence_score: number | null;
+  image_url: string | null;
+  location: string;
+  created_at: string;
+}
 
 interface Alert {
   id: string;
-  type: 'unauthorized_entry' | 'rfid_failure' | 'suspicious_activity' | 'emergency' | 'system_error';
+  type: 'unauthorized_entry' | 'rfid_failure' | 'suspicious_activity' | 'emergency' | 'system_error' | 'failed_attempt';
   title: string;
   description: string;
   location: string;
@@ -43,6 +58,7 @@ interface Alert {
   studentName?: string;
   cameraId?: string;
   actionTaken?: string;
+  confidenceScore?: number;
 }
 
 const mockAlerts: Alert[] = [
@@ -118,13 +134,86 @@ const mockAlerts: Alert[] = [
 
 export function AlertsPage() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
 
   const [alerts, setAlerts] = useState<Alert[]>(mockAlerts);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
+
+  // Helper function to check if a log entry is a failed attempt
+  const isFailedAttempt = useCallback((log: EntryLog): boolean => {
+    if (log.entry_type === 'failed_attempt') {
+      return true;
+    }
+    const nameLower = (log.student_name || '').toLowerCase().trim();
+    if (nameLower.includes('face detected') && nameLower.includes('no match')) {
+      return true;
+    }
+    if (nameLower.includes('no match found') || nameLower.includes('no matching student')) {
+      return true;
+    }
+    const regLower = (log.register_number || '').toLowerCase().trim();
+    if (regLower.includes('no match') || regLower.includes('failed') || 
+        (regLower.includes('face') && regLower.includes('detected'))) {
+      return true;
+    }
+    return false;
+  }, []);
+
+  // Fetch failed attempts from entry logs
+  const loadFailedAttempts = useCallback(async () => {
+    try {
+      const response = await fetch(`${FACE_RECOGNITION_API_BASE}/api/recent_entries?limit=1000`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch entry logs: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.entries) {
+        // Filter for failed attempts
+        const failedAttempts = data.entries.filter((log: EntryLog) => isFailedAttempt(log));
+        
+        // Convert failed attempts to alerts
+        const failedAlerts: Alert[] = failedAttempts.map((log: EntryLog) => ({
+          id: `FAILED_${log.id}`,
+          type: 'failed_attempt',
+          title: log.student_name === 'Face detected, no match found' 
+            ? 'Face Recognition Failed - Unknown Person'
+            : `Failed Entry Attempt - ${log.student_name || 'Unknown'}`,
+          description: log.student_name === 'Face detected, no match found'
+            ? 'Face was detected but no matching student found in database. Unauthorized access attempt.'
+            : `Failed entry attempt by ${log.student_name || log.register_number}. Face recognition confidence: ${log.confidence_score ? (log.confidence_score * 100).toFixed(1) + '%' : 'N/A'}`,
+          location: log.location || 'Unknown Location',
+          timestamp: new Date(log.timestamp || log.created_at),
+          severity: 'high',
+          status: 'active',
+          studentId: log.register_number !== 'UNKNOWN' ? log.register_number : undefined,
+          studentName: log.student_name !== 'Face detected, no match found' ? log.student_name : undefined,
+          confidenceScore: log.confidence_score || undefined
+        }));
+
+        // Merge with existing alerts (avoid duplicates)
+        setAlerts(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const newFailedAlerts = failedAlerts.filter(a => !existingIds.has(a.id));
+          return [...prev, ...newFailedAlerts];
+        });
+      }
+    } catch (error) {
+      console.error('Error loading failed attempts:', error);
+    }
+  }, [isFailedAttempt]);
+
+  // Load failed attempts on component mount
+  useEffect(() => {
+    loadFailedAttempts();
+    // Refresh every 30 seconds
+    const interval = setInterval(loadFailedAttempts, 30000);
+    return () => clearInterval(interval);
+  }, [loadFailedAttempts]);
 
   const filteredAlerts = alerts.filter(alert => {
     const matchesSearch = alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -165,6 +254,7 @@ export function AlertsPage() {
       case 'suspicious_activity': return Eye;
       case 'emergency': return AlertCircle;
       case 'system_error': return XCircle;
+      case 'failed_attempt': return XCircle;
       default: return Bell;
     }
   };
@@ -455,6 +545,7 @@ export function AlertsPage() {
                     <SelectItem value="suspicious_activity">Suspicious Activity</SelectItem>
                     <SelectItem value="emergency">Emergency</SelectItem>
                     <SelectItem value="system_error">System Error</SelectItem>
+                    <SelectItem value="failed_attempt">Failed Attempt</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
