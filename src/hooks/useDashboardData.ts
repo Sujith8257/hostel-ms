@@ -9,6 +9,46 @@ import {
 } from '@/lib/services';
 import type { DbStudent, DbEntryLog, DbAlert } from '@/types/database-models';
 
+const DASHBOARD_REQUEST_TIMEOUT_MS = 10000;
+const DASHBOARD_SAFETY_TIMEOUT_MS = 15000;
+const RECENT_STUDENTS_LIMIT = 8;
+
+interface StudentSummary {
+  totalStudents: number;
+  activeStudents: number;
+}
+
+async function fetchDashboardDataWithTimeout(timeoutMs = DASHBOARD_REQUEST_TIMEOUT_MS) {
+  const fetchPromise = Promise.all([
+    studentService.getRecentStudents(RECENT_STUDENTS_LIMIT),
+    entryLogService.getEntryLogs(100), // Get recent logs
+    alertService.getAlerts(),
+    studentService.getStudentSummary()
+  ]) as Promise<[DbStudent[], DbEntryLog[], DbAlert[], StudentSummary]>;
+
+  if (timeoutMs <= 0) {
+    return fetchPromise;
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Dashboard data request timed out after ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race<[DbStudent[], DbEntryLog[], DbAlert[]]>([
+      fetchPromise,
+      timeoutPromise
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 export interface DashboardStats {
   totalStudents: number;
   activeStudents: number;
@@ -24,6 +64,10 @@ export function useDashboardData() {
   const [students, setStudents] = useState<DbStudent[]>([]);
   const [entryLogs, setEntryLogs] = useState<DbEntryLog[]>([]);
   const [alerts, setAlerts] = useState<DbAlert[]>([]);
+  const [studentSummary, setStudentSummary] = useState<StudentSummary>({
+    totalStudents: 0,
+    activeStudents: 0
+  });
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     activeStudents: 0,
@@ -39,7 +83,7 @@ export function useDashboardData() {
 
   // Calculate stats from raw data
   const calculateStats = (
-    studentsData: DbStudent[], 
+    summary: StudentSummary, 
     entryLogsData: DbEntryLog[], 
     alertsData: DbAlert[]
   ): DashboardStats => {
@@ -61,8 +105,8 @@ export function useDashboardData() {
     ).length;
 
     return {
-      totalStudents: studentsData.length,
-      activeStudents: studentsData.filter(s => s.is_active).length,
+      totalStudents: summary.totalStudents,
+      activeStudents: summary.activeStudents,
       todayEntries,
       todayExits,
       pendingAlerts,
@@ -74,41 +118,91 @@ export function useDashboardData() {
 
   // Initial data fetch
   useEffect(() => {
+    let isMounted = true;
+    const safetyTimeout = setTimeout(() => {
+      if (!isMounted) {
+        return;
+      }
+      console.warn('[useDashboardData] Forcing completion due to safety timeout');
+      setIsLoading(false);
+      setError((prev) => prev ?? 'Dashboard data is taking longer than expected. Showing last known values.');
+    }, DASHBOARD_SAFETY_TIMEOUT_MS);
+
     const fetchInitialData = async () => {
       try {
+        if (!isMounted) {
+          return;
+        }
         setIsLoading(true);
         setError(null);
 
-        const [studentsData, entryLogsData, alertsData] = await Promise.all([
-          studentService.getStudents(),
-          entryLogService.getEntryLogs(100), // Get recent logs
-          alertService.getAlerts()
-        ]);
+        const [studentsData, entryLogsData, alertsData, summaryData] = await fetchDashboardDataWithTimeout();
 
+        if (!isMounted) {
+          return;
+        }
+
+        setStudentSummary(summaryData);
         setStudents(studentsData);
         setEntryLogs(entryLogsData);
         setAlerts(alertsData);
-        setStats(calculateStats(studentsData, entryLogsData, alertsData));
+        setStats(calculateStats(summaryData, entryLogsData, alertsData));
       } catch (err) {
+        if (!isMounted) {
+          return;
+        }
         console.error('Error fetching dashboard data:', err);
+        setStudentSummary({ totalStudents: 0, activeStudents: 0 });
+        setStudents([]);
+        setEntryLogs([]);
+        setAlerts([]);
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
       } finally {
+        if (!isMounted) {
+          return;
+        }
+        clearTimeout(safetyTimeout);
         setIsLoading(false);
       }
     };
 
     fetchInitialData();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(safetyTimeout);
+    };
   }, []);
 
   // Set up real-time subscriptions
   useEffect(() => {
     const studentsChannel = subscribeToStudents((payload) => {
       if (payload.eventType === 'INSERT') {
-        setStudents(prev => [payload.new, ...prev]);
+        setStudents(prev => [payload.new, ...prev].slice(0, RECENT_STUDENTS_LIMIT));
+        setStudentSummary(prev => ({
+          totalStudents: prev.totalStudents + 1,
+          activeStudents: prev.activeStudents + (payload.new.is_active ? 1 : 0)
+        }));
       } else if (payload.eventType === 'UPDATE') {
         setStudents(prev => prev.map(s => s.id === payload.new.id ? payload.new : s));
+        if (payload.old) {
+          const wasActive = payload.old.is_active;
+          const isActive = payload.new.is_active;
+          if (wasActive !== isActive) {
+            setStudentSummary(prev => ({
+              totalStudents: prev.totalStudents,
+              activeStudents: prev.activeStudents + (isActive ? 1 : -1)
+            }));
+          }
+        }
       } else if (payload.eventType === 'DELETE') {
-        setStudents(prev => prev.filter(s => s.id !== payload.old.id));
+        setStudents(prev => prev.filter(s => s.id !== payload.old?.id));
+        if (payload.old) {
+          setStudentSummary(prev => ({
+            totalStudents: Math.max(0, prev.totalStudents - 1),
+            activeStudents: Math.max(0, prev.activeStudents - (payload.old.is_active ? 1 : 0))
+          }));
+        }
       }
     });
 
@@ -137,8 +231,8 @@ export function useDashboardData() {
 
   // Recalculate stats when data changes
   useEffect(() => {
-    setStats(calculateStats(students, entryLogs, alerts));
-  }, [students, entryLogs, alerts]);
+    setStats(calculateStats(studentSummary, entryLogs, alerts));
+  }, [studentSummary, entryLogs, alerts]);
 
   return {
     students,
@@ -150,12 +244,9 @@ export function useDashboardData() {
     refetch: async () => {
       try {
         setError(null);
-        const [studentsData, entryLogsData, alertsData] = await Promise.all([
-          studentService.getStudents(),
-          entryLogService.getEntryLogs(100),
-          alertService.getAlerts()
-        ]);
+        const [studentsData, entryLogsData, alertsData, summaryData] = await fetchDashboardDataWithTimeout();
 
+        setStudentSummary(summaryData);
         setStudents(studentsData);
         setEntryLogs(entryLogsData);
         setAlerts(alertsData);

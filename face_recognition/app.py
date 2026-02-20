@@ -18,8 +18,27 @@ import binascii
 from datetime import datetime, date
 import uuid
 
+# Security Agent (rule-based: log incidents, email admin on unauthorized attempts)
+from security.logger import set_supabase_client, log_incident, get_attempt_count_last_5min
+from security.agent import security_agent
+from security.notifier import send_alert_email_async
+from security.rules import LOG_ONLY, MEDIUM_ALERT, HIGH_ALERT
+
 # Load environment variables
 load_dotenv()
+
+# ------------------------------
+# Windows: avoid MediaPipe protobuf parsing error (backslash in path)
+# MediaPipe's graph config can break when cwd or resource path contains "\\"
+# ------------------------------
+if os.name == "nt":
+    try:
+        _cwd = os.getcwd()
+        _cwd_fwd = _cwd.replace("\\", "/")
+        if "\\" in _cwd:
+            os.chdir(_cwd_fwd)
+    except Exception:
+        pass
 
 # ------------------------------
 # Supabase Configuration
@@ -27,6 +46,9 @@ load_dotenv()
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(url, key)
+
+# Wire Supabase into security logger so incidents use same client
+set_supabase_client(supabase)
 
 # ------------------------------
 # Load TFLite Model
@@ -269,8 +291,26 @@ def log_entry(register_number: str, student_name: str, entry_type: str = 'entry'
         print(f"Error logging entry: {e}")
         return False
 
+def _get_system_profile_id_for_attendance() -> Optional[str]:
+    """
+    Return a profile id to use as marked_by when logging attendance from face recognition.
+    attendance_logs.marked_by must reference the profiles table (staff/admin), not students.
+    Uses env ATTENDANCE_SYSTEM_PROFILE_ID if set, else the first profile in the DB.
+    """
+    env_id = os.environ.get("ATTENDANCE_SYSTEM_PROFILE_ID", "").strip()
+    if env_id:
+        return env_id
+    try:
+        r = supabase.table("profiles").select("id").limit(1).execute()
+        if r.data and len(r.data) > 0:
+            return r.data[0].get("id")
+    except Exception as e:
+        print(f"Could not get system profile for attendance: {e}")
+    return None
+
+
 def log_attendance(student_id: str, marked_by: str, status: str = 'present', building_id: str = None, floor_number: int = None, notes: str = None) -> bool:
-    """Log attendance to attendance_logs table"""
+    """Log attendance to attendance_logs table. marked_by must be a profile id (from profiles table)."""
     try:
         today = date.today()
         
@@ -1252,14 +1292,18 @@ async def authenticate(register_number: str = Form(...), file: UploadFile = File
                 location=location
             )
             
-            # Log attendance (mark as present)
-            # For attendance, we need a marked_by user ID - using system user for now
-            attendance_logged = log_attendance(
-                student_id=student_info['id'],
-                marked_by=student_info['id'],  # Self-marked for face recognition
-                status='present',
-                notes=f'Auto-marked via face recognition (confidence: {similarity:.2%})'
-            )
+            # Log attendance (mark as present). marked_by must be a profile id, not student id.
+            system_profile_id = _get_system_profile_id_for_attendance()
+            attendance_logged = False
+            if system_profile_id:
+                attendance_logged = log_attendance(
+                    student_id=student_info['id'],
+                    marked_by=system_profile_id,
+                    status='present',
+                    notes=f'Auto-marked via face recognition (confidence: {similarity:.2%})'
+                )
+            else:
+                print("Skipping attendance log: no ATTENDANCE_SYSTEM_PROFILE_ID and no profile in DB.")
             
             return {
                 "success": success, 
@@ -1694,13 +1738,18 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 location=location
             )
             
-            # Log attendance (mark as present)
-            attendance_logged = log_attendance(
-                student_id=best_match['id'],
-                marked_by=best_match['id'],  # Self-marked for face recognition
-                status='present',
-                notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
-            )
+            # Log attendance (mark as present). marked_by must be a profile id, not student id.
+            system_profile_id = _get_system_profile_id_for_attendance()
+            attendance_logged = False
+            if system_profile_id:
+                attendance_logged = log_attendance(
+                    student_id=best_match['id'],
+                    marked_by=system_profile_id,
+                    status='present',
+                    notes=f'Auto-marked via face recognition (confidence: {best_similarity:.2%})'
+                )
+            else:
+                print("Skipping attendance log: no ATTENDANCE_SYSTEM_PROFILE_ID and no profile in DB.")
             
             return {
                 "success": True,
@@ -1718,15 +1767,92 @@ async def recognize_face(file: UploadFile = File(...), location: str = Form('Mai
                 "message": f"Welcome {best_match['full_name']}! Entry logged successfully."
             }
         else:
-            return {
+            # ----- Security Agent: unauthorized attempt -----
+            print(f"\n🚨 [SECURITY] Unauthorized attempt detected!")
+            print(f"   Best similarity: {best_similarity:.4f} (threshold: {recognition_threshold})")
+            print(f"   Location: {location}")
+            
+            ts = datetime.now()
+            count_prev = get_attempt_count_last_5min(location)
+            attempt_count_last_5min = count_prev + 1  # include this attempt
+            print(f"   Previous attempts in last 5min: {count_prev}, total: {attempt_count_last_5min}")
+            
+            event = {
+                "timestamp": ts,
+                "face_match": False,
+                "confidence_score": float(best_similarity) if best_match else 0.0,
+                "person_id": None,
+                "gate_id": location,
+                "image_path": None,
+                "attempt_count_last_5min": attempt_count_last_5min,
+            }
+            print(f"   Calling security agent...")
+            try:
+                decision = security_agent(event)
+                severity = decision["decision"]
+                reason = decision["reason"]
+                reasoning = decision.get("reasoning") or ""
+                recommended_action = decision.get("recommended_action") or ""
+                
+                # Print agent decision for visibility
+                print(f"\n🤖 [SECURITY AGENT] Decision: {severity}")
+                print(f"   Reason: {reason}")
+                if reasoning:
+                    print(f"   AI Reasoning: {reasoning}")
+                if recommended_action:
+                    print(f"   Recommended Action: {recommended_action}\n")
+            except Exception as agent_err:
+                print(f"❌ [SECURITY AGENT] Error: {agent_err}")
+                import traceback
+                traceback.print_exc()
+                # Fallback to basic rule
+                severity = "medium_alert"
+                reason = f"Security agent error: {str(agent_err)}"
+                reasoning = ""
+                recommended_action = ""
+            
+            # Log incident (optional - skip if table doesn't exist)
+            try:
+                log_incident(
+                    gate_id=location,
+                    severity=severity,
+                    confidence_score=float(best_similarity) if best_match else None,
+                    image_path=None,
+                    attempt_count=attempt_count_last_5min,
+                    resolved=False,
+                )
+            except Exception as e:
+                print(f"[security] Skipping DB log (table may not exist): {e}")
+            
+            # ALWAYS send email (for testing agentic AI)
+            send_alert_email_async(
+                severity=severity,
+                timestamp=ts.isoformat(),
+                gate_id=location,
+                confidence_score=float(best_similarity) if best_match else None,
+                attempt_count=attempt_count_last_5min,
+                image_path=None,
+                reasoning=reasoning,
+                recommended_action=recommended_action,
+            )
+            out = {
                 "success": True,
                 "recognized": False,
-                "face_detected": True,
+                "face_detected": True,  # IMPORTANT: Face WAS detected, just not recognized
                 "best_similarity": float(best_similarity) if best_match else 0.0,
                 "threshold": recognition_threshold,
                 "students_checked": len(students_with_faces),
-                "message": "Face detected but no matching student found in database."
+                "message": f"Face detected (similarity: {best_similarity:.2%}) but no matching student found (threshold: {recognition_threshold}).",
+                "security_decision": severity,
+                "security_reason": reason,
             }
+            if reasoning:
+                out["security_reasoning"] = reasoning
+            if recommended_action:
+                out["security_recommended_action"] = recommended_action
+            
+            print(f"✅ [RESPONSE] Returning: face_detected=True, recognized=False, security_decision={severity}")
+            return out
             
     except Exception as e:
         return {

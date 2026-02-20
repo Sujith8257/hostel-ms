@@ -23,3 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+face_recognition/.venv/

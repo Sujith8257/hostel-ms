@@ -142,6 +142,41 @@ export const studentService = {
     throw lastError || new Error('Failed to fetch students');
   },
 
+  async getRecentStudents(limit = 10): Promise<DbStudent[]> {
+    const { data, error } = await supabase
+      .from('students')
+      .select('id,register_number,full_name,email,phone,hostel_status,room_number,is_active,created_at,updated_at')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+    return (data ?? []).map((student) => ({
+      ...student,
+      face_embedding: null,
+      profile_image_url: null,
+    })) as DbStudent[];
+  },
+
+  async getStudentSummary(): Promise<{ totalStudents: number; activeStudents: number }> {
+    const { count: totalCount, error: totalError } = await supabase
+      .from('students')
+      .select('id', { count: 'exact', head: true });
+
+    if (totalError) throw totalError;
+
+    const { count: activeCount, error: activeError } = await supabase
+      .from('students')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_active', true);
+
+    if (activeError) throw activeError;
+
+    return {
+      totalStudents: totalCount ?? 0,
+      activeStudents: activeCount ?? 0,
+    };
+  },
+
   async getStudent(id: string): Promise<DbStudent> {
     const { data, error } = await supabase
       .from('students')
