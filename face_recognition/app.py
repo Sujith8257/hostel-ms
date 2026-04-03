@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import mediapipe as mp
-import tensorflow as tf
+import onnxruntime as ort
 from scipy.spatial.distance import cosine
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,12 +51,27 @@ supabase: Client = create_client(url, key)
 set_supabase_client(supabase)
 
 # ------------------------------
-# Load TFLite Model
+# Load ArcFace ONNX Model
 # ------------------------------
-interpreter = tf.lite.Interpreter(model_path="output_model.tflite")
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+_MODEL_CANDIDATES = [
+    os.environ.get("ARCFACE_MODEL_PATH", "").strip(),
+    "arcface.onnx",
+    os.path.join("..", "arcface.onnx"),
+]
+_MODEL_PATH = next((p for p in _MODEL_CANDIDATES if p and os.path.exists(p)), None)
+if not _MODEL_PATH:
+    raise RuntimeError(
+        "ArcFace model not found. Set ARCFACE_MODEL_PATH or place arcface.onnx in "
+        "face_recognition/ or project root."
+    )
+
+print(f"📦 Loading ArcFace ONNX model from: {_MODEL_PATH}")
+onnx_session = ort.InferenceSession(_MODEL_PATH, providers=["CPUExecutionProvider"])
+onnx_input = onnx_session.get_inputs()[0]
+onnx_output_names = [o.name for o in onnx_session.get_outputs()]
+onnx_output_name = "embedding" if "embedding" in onnx_output_names else onnx_output_names[0]
+print(f"   Input: name={onnx_input.name}, shape={onnx_input.shape}, type={onnx_input.type}")
+print(f"   Output: name={onnx_output_name}, available_outputs={onnx_output_names}")
 
 mp_face_detection = mp.solutions.face_detection
 
@@ -371,16 +386,17 @@ def preprocess_face(image):
         if face.size == 0:
             return None
         face = cv2.resize(face, (112, 112))
-        face = face.astype("float32") / 127.5 - 1.0
+        # ArcFace ONNX export expects RGB input and ArcFace-style normalization.
+        face = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+        face = (face.astype(np.float32) - 127.5) / 128.0
         return np.expand_dims(face, axis=0)
 
 # ------------------------------
 # Get embedding
 # ------------------------------
 def get_embedding(face_img):
-    interpreter.set_tensor(input_details[0]['index'], face_img)
-    interpreter.invoke()
-    embedding = interpreter.get_tensor(output_details[0]['index']).flatten()
+    outputs = onnx_session.run([onnx_output_name], {onnx_input.name: face_img})
+    embedding = np.asarray(outputs[0], dtype=np.float32).flatten()
     # L2 normalize
     embedding = embedding / np.linalg.norm(embedding)
     

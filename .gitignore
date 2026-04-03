@@ -30,3 +30,11 @@ venv/
 env/
 ENV/
 face_recognition/.venv/
+
+# Face model artifacts
+arcface.onnx
+face_recognition/*.onnx
+
+# Python cache
+__pycache__/
+*.pyc
